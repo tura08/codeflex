@@ -27,8 +27,6 @@ This document bundles:
 │  │  ├─ layout.tsx        # RootLayout: imports globals, ThemeProvider, TopNav, SideNav
 │  │  ├─ page.tsx          # Dashboard: ProjectList
 │  │  ├─ apps/
-│  │  │  └─ new/page.tsx   # New Project: VariableForm + ScoreSummary
-│  │  └─ apps/[id]/page.tsx # Project Detail: VariableTable + ScoreSummary
 │  ├─ components/
 │  │  ├─ TopNav.tsx        # NavigationMenu + theme toggle
 │  │  ├─ SideNav.tsx       # sidebar links
@@ -136,7 +134,7 @@ Commit & push when auth gating is in place.
 ## 🚀 ROADMAP (MVP → Version 4)
 
 ### MVP
-1. Frontend Next.js + shadcn/ui shell (TopNav, SideNav, Dashboard)
+1. Frontend Next.js + shadcn/ui shell (NavBar, SideBar, Dashboard)
 2. VariableForm + live ScoreSummary + VariableTable
 3. Save & restore configs in Supabase (no auth)
 

@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    domains: [
+      'github.com',
+      // if you ever use raw avatar URLs, you might also add:
+      // 'avatars.githubusercontent.com',
+    ],
+  },
 };
 
 export default nextConfig;

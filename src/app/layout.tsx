@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { TopNav } from '@/components/TopNav';
-import { SideNav } from '@/components/SideNav';
+import { NavBar } from '@/components/NavBar';
+import { SideBar } from '@/components/SideBar';
 import { ProjectProvider } from "@/context/ProjectContext";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { cookies } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,22 +22,25 @@ export const metadata: Metadata = {
   description: 'Platform for defining and designing powerful interconnected apps.',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const cookieStore = await cookies()
+  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[var(--background)] text-[var(--foreground)]`}
       >
         <ProjectProvider>
-          <TopNav />
-          <div className="flex flex-1 h-screen overflow-hidden">
-            <SideNav />
-            <main className="flex-1 overflow-auto p-6">
-              {children}
+          <SidebarProvider defaultOpen={defaultOpen}>
+            <SideBar />
+            <main className="w-full">
+              <NavBar />
+              <div className="px-4">{children}</div>
             </main>
-          </div>
+          </SidebarProvider>
         </ProjectProvider>
       </body>
     </html>

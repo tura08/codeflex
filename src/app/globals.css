@@ -53,7 +53,7 @@
   /* Surfaces */
   --card:                  #ffe4c8; /* light mocha */
   --card-foreground:       #3a230b;
-  --popover:               #74512D; /* rich brown */
+  --popover:               #b27c46; /* rich brown */
   --popover-foreground:    #F8F4E1;
 
   /* Primary & Secondary */
@@ -144,7 +144,6 @@
   --sidebar-border:       #D9C4AB;
   --sidebar-ring:         #AF8F6F;
 }
-
 
 @layer base {
   * {
