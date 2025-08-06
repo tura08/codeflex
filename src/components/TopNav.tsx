@@ -23,7 +23,7 @@ export function TopNav() {
     <header
       className="
         h-16 px-4 flex items-center justify-between
-        bg-secondary
+        bg-sidebar
         dark:bg-secondary dark:text-black
       "
     >
@@ -68,7 +68,7 @@ export function TopNav() {
 
       {/* Actions: theme toggle + new project */}
       <div className="flex items-center space-x-2">
-        <Button className='bg-secondary' variant="ghost" size="icon" onClick={toggle}>
+        <Button className='bg-background' variant="ghost" size="icon" onClick={toggle}>
           {theme === 'light' ? <Moon /> : <Sun />}
         </Button>
         <Button variant="outline" size="sm" asChild>
