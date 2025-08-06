@@ -26,9 +26,9 @@ This document bundles:
 │  ├─ app/
 │  │  ├─ layout.tsx        # RootLayout: imports globals, ThemeProvider, TopNav, SideNav
 │  │  ├─ page.tsx          # Dashboard: ProjectList
-│  │  ├─ projects/
+│  │  ├─ apps/
 │  │  │  └─ new/page.tsx   # New Project: VariableForm + ScoreSummary
-│  │  └─ projects/[id]/page.tsx # Project Detail: VariableTable + ScoreSummary
+│  │  └─ apps/[id]/page.tsx # Project Detail: VariableTable + ScoreSummary
 │  ├─ components/
 │  │  ├─ TopNav.tsx        # NavigationMenu + theme toggle
 │  │  ├─ SideNav.tsx       # sidebar links
@@ -72,8 +72,8 @@ This document bundles:
 ### 🔗 Integrations & Connections
 
 - **Supabase** (free-tier)
-  - Table `projects`: `id` (UUID), `name`, `variables` (JSON), `created_at`
-  - CRUD via Next.js API Routes (`src/app/api/projects/...`)
+  - Table `apps`: `id` (UUID), `name`, `variables` (JSON), `created_at`
+  - CRUD via Next.js API Routes (`src/app/api/apps/...`)
 - **Next.js App Router**: file-based routes under `app/`
 - **shadcn/ui**: styled components (button, input, table, card, navigation-menu)
 - **Tailwind CSS**: utility-first styling, integrated in `globals.css`
@@ -91,7 +91,7 @@ Enhance ProjectCard to display a progress bar or difficulty indicator.
 Commit & push once your dashboard renders dynamic data nicely.
 
 2. “New Project” Page & VariableForm
-Create a route at /projects/new (add src/app/projects/new/page.tsx).
+Create a route at /apps/new (add src/app/apps/new/page.tsx).
 
 Render your existing VariableForm on that page, alongside a live ScoreSummary.
 
@@ -100,7 +100,7 @@ Ensure the form updates state and the summary updates in real time.
 Commit & push after the form + live score works.
 
 3. VariableTable & Editing
-Under /projects/[id], scaffold an edit page (e.g. src/app/projects/[id]/page.tsx).
+Under /apps/[id], scaffold an edit page (e.g. src/app/apps/[id]/page.tsx).
 
 Render your VariableTable there, hooked to the same state you built in “New Project”.
 
@@ -109,25 +109,25 @@ Allow inline edits (name, weight, score) and removals.
 Commit & push once editing flows correctly.
 
 4. Supabase Integration
-Wire up your Supabase client and create a projects table with columns: id, name, variables (jsonb), created_at.
+Wire up your Supabase client and create a apps table with columns: id, name, variables (jsonb), created_at.
 
-In /projects/new, on form submit push the new project to Supabase.
+In /apps/new, on form submit push the new project to Supabase.
 
-In DashboardPage, fetch the list of projects from Supabase instead of mocks.
+In DashboardPage, fetch the list of apps from Supabase instead of mocks.
 
 Commit & push when your app is persisting and retrieving real data.
 
 5. Routing & Navigation
-Ensure clicking a ProjectCard navigates to /projects/[id] and loads that project’s details from Supabase.
+Ensure clicking a ProjectCard navigates to /apps/[id] and loads that project’s details from Supabase.
 
 Add a “Back to Dashboard” link in the project detail page.
 
 Commit & push once navigation and deep-linking works.
 
 6. Basic Authentication (Phase 2 Prep)
-Optionally scaffold Supabase Auth (email/password) so that only you can see your projects.
+Optionally scaffold Supabase Auth (email/password) so that only you can see your apps.
 
-Protect the /projects routes behind a “signed-in” check.
+Protect the /apps routes behind a “signed-in” check.
 
 Commit & push when auth gating is in place.
 
@@ -142,7 +142,7 @@ Commit & push when auth gating is in place.
 
 ### Phase 2
 1. Multi-user authentication (Supabase Auth or Auth0)
-2. Dashboard: list projects, filters (date, score)
+2. Dashboard: list apps, filters (date, score)
 3. Templates: pre-defined variable sets
 
 ### Phase 3

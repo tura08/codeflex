@@ -22,7 +22,7 @@ export function ProjectCard({ id, name, createdAt, score }: ProjectCardProps) {
   const percent = Math.round((score / 5) * 100)
 
   return (
-    <Link href={`/projects/${id}`}>
+    <Link href={`/apps/${id}`}>
       <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>{name}</CardTitle>

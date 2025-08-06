@@ -7,14 +7,14 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   FolderOpen,
-  FileText,
   Settings,
+  AppWindowMac,
 } from 'lucide-react'
 
 const menuItems = [
   { href: '/',            label: 'Dashboard', icon: LayoutDashboard     },
   { href: '/variables',   label: 'Variables',  icon: SlidersHorizontal  },
-  { href: '/projects',    label: 'Projects',   icon: FolderOpen         },
+  { href: '/apps',    label: 'Apps',   icon: AppWindowMac         },
   { href: '/settings',    label: 'Settings',   icon: Settings           },
 ]
 

@@ -14,10 +14,10 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">All Projects</h1>
+      <h1 className="text-2xl font-bold">All Apps</h1>
       <div className="flex space-x-8">
         <div className="p-4 bg-[var(--card)] rounded shadow">
-          <p className="text-sm">Total Projects</p>
+          <p className="text-sm">Total Apps</p>
           <p className="text-xl font-semibold">{total}</p>
         </div>
         <div className="p-4 bg-[var(--card)] rounded shadow">

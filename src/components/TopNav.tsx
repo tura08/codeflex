@@ -30,7 +30,7 @@ export function TopNav() {
       {/* Brand + NavigationMenu */}
       <div className="flex items-center space-x-8">
         <Link href="/" className="text-xl font-bold">
-          Difficulty Estimator
+          CodeFlex
         </Link>
 
         <NavigationMenu>
@@ -45,10 +45,10 @@ export function TopNav() {
             </NavigationMenuItem>
 
             <NavigationMenuItem>
-              <NavigationMenuTrigger>Projects</NavigationMenuTrigger>
+              <NavigationMenuTrigger>Apps</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <NavigationMenuLink asChild>
-                  <Link href="/projects">All Projects</Link>
+                  <Link href="/apps">All Apps</Link>
                 </NavigationMenuLink>
               </NavigationMenuContent>
             </NavigationMenuItem>
@@ -72,9 +72,9 @@ export function TopNav() {
           {theme === 'light' ? <Moon /> : <Sun />}
         </Button>
         <Button variant="outline" size="sm" asChild>
-          <Link href="/projects/new" className="flex items-center space-x-1">
+          <Link href="/apps/new" className="flex items-center space-x-1">
             <Plus className="h-4 w-4" />
-            <span>New Project</span>
+            <span>New App</span>
           </Link>
         </Button>
       </div>

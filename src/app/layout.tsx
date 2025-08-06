@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Difficulty Estimator",
-  description: "Platform for estimating project difficulty",
-};
+  title: 'CodeFlex',
+  description: 'Platform for defining and designing powerful interconnected apps.',
+}
 
 export default function RootLayout({
   children,
