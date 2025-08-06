@@ -1,17 +1,31 @@
+// File: src/context/ProjectContext.tsx
 'use client'
 
-import {
+import React, {
   createContext,
   useContext,
   useState,
   useEffect,
   ReactNode,
 } from 'react'
+import { supabase } from '@/lib/supabase-client'
 import type { ProjectCardProps } from '@/components/ProjectCard'
+import type {
+  PostgrestResponse,
+  PostgrestSingleResponse,
+} from '@supabase/supabase-js'
+
+// Mirror your DB columns exactly:
+interface ProjectRow {
+  id: string
+  name: string
+  score: number
+  created_at: string
+}
 
 interface ProjectContextType {
   projects: ProjectCardProps[]
-  addProject: (proj: Omit<ProjectCardProps, 'id' | 'createdAt'>) => void
+  addProject: (proj: Omit<ProjectCardProps, 'id' | 'createdAt'>) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -19,21 +33,50 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<ProjectCardProps[]>([])
 
-  // load initial mock data
   useEffect(() => {
-    fetch('/projects.json')
-      .then((res) => res.json())
-      .then((data: ProjectCardProps[]) => setProjects(data))
+    supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }: PostgrestResponse<ProjectRow>) => {
+        if (error) {
+          console.error('Fetch error:', error.message)
+          return
+        }
+        if (data) {
+          const mapped = data.map((row) => ({
+            id: row.id,
+            name: row.name,
+            score: row.score,
+            createdAt: row.created_at,
+          }))
+          setProjects(mapped)
+        }
+      })
   }, [])
 
-  const addProject = (proj: Omit<ProjectCardProps, 'id' | 'createdAt'>) => {
-    const newProj: ProjectCardProps = {
-      ...proj,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString().split('T')[0],
+  const addProject = async (proj: Omit<ProjectCardProps, 'id' | 'createdAt'>) => {
+    const { data, error }: PostgrestSingleResponse<ProjectRow> = await supabase
+      .from('projects')                // still no generics
+      .insert({ name: proj.name, score: proj.score })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Insert error:', error.message)
+      return
     }
-    // prepend for visibility
-    setProjects((prev) => [newProj, ...prev])
+    if (data) {
+      setProjects((prev) => [
+        {
+          id: data.id,
+          name: data.name,
+          score: data.score,
+          createdAt: data.created_at,
+        },
+        ...prev,
+      ])
+    }
   }
 
   return (

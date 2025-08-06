@@ -51,7 +51,7 @@
   --foreground:            #543310; /* darkest brown */
 
   /* Surfaces */
-  --card:                  #ffe4c8; /* light mocha */
+  --card:                  #fff3e7; /* light mocha */
   --card-foreground:       #3a230b;
   --popover:               #b27c46; /* rich brown */
   --popover-foreground:    #F8F4E1;
@@ -73,8 +73,8 @@
 
   /* Borders/Inputs/Rings */
   --border:                #D9C4AB;
-  --input:                 #F8F4E1;
-  --ring:                  #74512D;
+  --input:                 #D9C4AB;
+  --ring:                  #e8af75;
 
   /* Charts */
   --chart-1:               #543310;
@@ -84,11 +84,11 @@
   --chart-5:               #F8F4E1;
 
   /* Sidebar */
-  --sidebar:               #ffddba;
+  --sidebar:               #fff3e7;
   --sidebar-foreground:    #543310;
   --sidebar-primary:       #74512D;
   --sidebar-primary-foreground: #F8F4E1;
-  --sidebar-accent:        #f1b77c;
+  --sidebar-accent:        #f6cba0;
   --sidebar-accent-foreground:   #543310;
   --sidebar-border:        #D9C4AB;
   --sidebar-ring:          #74512D;
