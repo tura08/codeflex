@@ -26,7 +26,7 @@ import {
 
 const items = [
   { title: 'Dashboard',   url: '/',          icon: LayoutDashboard   },
-  { title: 'Variables',   url: '/variables', icon: SlidersHorizontal },
+  { title: 'Analyse',   url: '/analyse', icon: SlidersHorizontal },
   { title: 'Apps',        url: '/apps',      icon: AppWindowMac      },
   { title: 'Settings',    url: '/settings',  icon: Settings          },
 ]
