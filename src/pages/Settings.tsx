@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Eye, EyeOff, Save } from "lucide-react"
 
+import { GoogleDriveCard } from "@/components/integrations/GoogleDriveCard";
+
 export default function SettingsPage() {
   const [dbUrl, setDbUrl] = useState("")
   const [supabaseKey, setSupabaseKey] = useState("")
@@ -109,6 +111,8 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Google Drive & Sheets */}
+      <GoogleDriveCard />
       {/* Appearance */}
       <Card>
         <CardHeader>

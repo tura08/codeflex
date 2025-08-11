@@ -43,6 +43,7 @@ export function SideBar() {
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarSeparator />
         <SidebarGroup>
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarMenu>
@@ -69,7 +70,6 @@ export function SideBar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarSeparator />
       </SidebarContent>
 
       <SidebarFooter>{/* optional footer content */}</SidebarFooter>
