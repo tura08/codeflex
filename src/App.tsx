@@ -5,12 +5,13 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import Analyse from "@/pages/Analyse"
 import Settings from "@/pages/Settings"
 import NotFound from "@/pages/NotFound"
-import Apps from "./pages/apps/Apps"
-import AppDetails from "./pages/apps/AppDetails"
-import NewApp from "./pages/apps/NewApp"
+import Apps from "@/pages/apps/Apps"
+import AppDetails from "@/pages/apps/AppDetails"
+import NewApp from "@/pages/apps/NewApp"
 import Dashboard from "@/pages/Dashboard"
 import LoginPage from "@/pages/Login"
-import SignupPage from "./pages/Signup"
+import SignupPage from "@/pages/Signup"
+import SheetsManager from "@/pages/apps/SheetsManager/index"
 
 export default function App() {
   return (
@@ -35,7 +36,9 @@ export default function App() {
                     <Route path="/apps" element={<Apps />} />
                     <Route path="/apps/new" element={<NewApp />} />
                     <Route path="/apps/:id" element={<AppDetails />} />
+                    <Route path="/apps/sheetsmanager" element={<SheetsManager />} />
                     <Route path="/settings" element={<Settings />} />
+
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </main>
