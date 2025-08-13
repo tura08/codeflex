@@ -1,5 +1,4 @@
-// Minimal Google Identity Services + Drive/Sheets helpers
-// Works entirely in the browser—no client secret, no backend.
+// src/lib/google/client.ts
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const SCOPES = [

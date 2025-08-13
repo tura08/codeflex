@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GoogleConnect } from "@/integrations/google/components/GoogleConnect";
-import { SpreadsheetSelect } from "@/integrations/google/components/SpreadsheetSelect";
-import { SheetTabSelect } from "@/integrations/google/components/SheetTabSelect";
+import { GoogleConnect, SpreadsheetSelect, SheetTabSelect } from "@/integrations/google/components/SheetsWidgets";
 
 export function SourceControls(props: {
   spreadsheetId: string; setSpreadsheetId: (v: string) => void;
@@ -12,6 +10,8 @@ export function SourceControls(props: {
   onPreview: () => void;
   onSaveSource: () => void;
   loading?: boolean;
+  compact?: boolean;
+  showActions?: boolean; // NEW
 }) {
   const {
     spreadsheetId, setSpreadsheetId,
@@ -19,11 +19,11 @@ export function SourceControls(props: {
     headerRow, setHeaderRow,
     maxRows, setMaxRows,
     onPreview, onSaveSource,
-    loading
+    loading, compact, showActions = true,
   } = props;
 
   return (
-    <div className="grid gap-4">
+    <div className={`grid gap-4 ${compact ? "" : ""}`}>
       <GoogleConnect />
 
       <div className="grid gap-2">
@@ -32,31 +32,48 @@ export function SourceControls(props: {
       </div>
 
       {spreadsheetId && (
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
             <label className="text-sm font-medium">Tab</label>
             <SheetTabSelect spreadsheetId={spreadsheetId} value={sheetName} onChange={setSheetName} />
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Header row</label>
-            <Input className="w-24" type="number" min={1} value={headerRow}
-              onChange={(e)=>setHeaderRow(Number(e.target.value) || 1)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Header row</label>
+              <Input
+                type="number"
+                min={1}
+                value={headerRow}
+                onChange={(e) => setHeaderRow(Number(e.target.value) || 1)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Preview rows</label>
+              <Input
+                type="number"
+                min={1}
+                value={maxRows}
+                onChange={(e) => setMaxRows(Number(e.target.value) || 50)}
+              />
+            </div>
           </div>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Preview rows</label>
-            <Input className="w-24" type="number" min={1} value={maxRows}
-              onChange={(e)=>setMaxRows(Number(e.target.value) || 50)} />
-          </div>
-
-          <Button className="cursor-pointer" onClick={onPreview} disabled={!sheetName || !!loading}>
-            {loading ? "Loading…" : "Load Preview"}
-          </Button>
-
-          <Button variant="outline" className="cursor-pointer" onClick={onSaveSource} disabled={!sheetName}>
-            Save as Source
-          </Button>
+          {showActions && (
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-end sm:col-span-2">
+              <Button className="cursor-pointer sm:w-auto w-full" onClick={onPreview} disabled={!sheetName || !!loading}>
+                {loading ? "Loading…" : "Load Preview"}
+              </Button>
+              <Button
+                variant="outline"
+                className="cursor-pointer sm:w-auto w-full"
+                onClick={onSaveSource}
+                disabled={!sheetName}
+              >
+                Save as Source
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
