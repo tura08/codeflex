@@ -1,7 +1,17 @@
 // src/integrations/google/hooks/usePreviewPipeline.ts
 import { useCallback, useMemo, useRef, useState } from "react";
-import { applyRules, validate, qualityFromIssues, type TransformRule, type Issue } from "@/lib/google/sheets-import";
-import { inferType, normalizeHeader, type SimpleType } from "@/lib/google/infer";
+import {
+  applyRules,
+  validate,
+  qualityFromIssues,
+  type TransformRule,
+  type Issue,
+} from "@/lib/google/sheets-import";
+import {
+  inferType,
+  normalizeHeader,
+  type SimpleType,
+} from "@/lib/google/infer";
 
 type FetchPreviewFn = (
   spreadsheetId: string,
@@ -12,8 +22,12 @@ type FetchPreviewFn = (
 
 export type Mapping = { map_from: string; name: string; type: SimpleType };
 
+// pick map_from headers for a given type
+function pickColumnsByType(mapping: Mapping[], t: SimpleType): string[] {
+  return mapping.filter((m) => m.type === t).map((m) => m.map_from);
+}
+
 export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
-  // keep the latest fn without retriggering memos if identity changes
   const fetchPreviewRef = useRef(fetchPreview);
   fetchPreviewRef.current = fetchPreview;
 
@@ -25,68 +39,105 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // MVP toggles (apply to all columns)
+  // toggles
   const [trimSpaces, setTrimSpaces] = useState(false);
   const [normalizeDates, setNormalizeDates] = useState(false);
   const [normalizeCurrency, setNormalizeCurrency] = useState(false);
 
-  const buildRules = useCallback((): TransformRule[] => {
-    if (!headers.length) return [];
-    const all = headers.slice();
-    const rules: TransformRule[] = [];
-    if (trimSpaces) rules.push({ kind: "trim", columns: all });
-    if (normalizeCurrency) rules.push({ kind: "parseCurrency", columns: all });
-    if (normalizeDates) rules.push({ kind: "parseDate", columns: all, dayFirst: true });
-    return rules;
-  }, [headers, trimSpaces, normalizeCurrency, normalizeDates]);
+  const buildRules = useCallback(
+    (mappingRef: Mapping[]): TransformRule[] => {
+      if (!headers.length) return [];
+      const rules: TransformRule[] = [];
 
-  const recompute = useCallback((baseRows?: any[][]) => {
-    if (!headers.length) return;
-    const raw = baseRows ?? rawRows;
+      if (trimSpaces) rules.push({ kind: "trim", columns: headers });
 
-    // 1) transforms
-    const transformed = applyRules(raw, headers, buildRules());
-    setRows(transformed);
+      if (!mappingRef.length) return rules;
 
-    // 2) mapping based on transformed
-    const used = new Set<string>();
-    const cols: Mapping[] = headers.map((h, i) => ({
-      map_from: h,
-      name: normalizeHeader(h, i, used),
-      type: inferType(transformed.map(r => r[i])),
-    }));
-    setMapping(cols);
+      const dateCols = pickColumnsByType(mappingRef, "date");
+      const numCols = pickColumnsByType(mappingRef, "number");
 
-    // 3) validation
-    const types = cols.map(c => c.type);
-    setIssues(validate(transformed, headers, types));
-  }, [headers, rawRows, buildRules]);
+      if (normalizeDates && dateCols.length) {
+        rules.push({ kind: "parseDate", columns: dateCols, dayFirst: true });
+      }
+      if (normalizeCurrency && numCols.length) {
+        rules.push({ kind: "parseCurrency", columns: numCols });
+      }
+      return rules;
+    },
+    [headers, trimSpaces, normalizeDates, normalizeCurrency]
+  );
 
-  const loadPreview = useCallback(async (spreadsheetId: string, sheetName: string, headerRow: number, maxRows: number) => {
-    setLoading(true);
-    try {
-      const { headers, rows } = await fetchPreviewRef.current(spreadsheetId, sheetName, headerRow, maxRows);
-      setHeaders(headers);
-      setRawRows(rows);
+  const recompute = useCallback(
+    (baseRows?: any[][], opts?: { keepMapping?: boolean }) => {
+      if (!headers.length) return;
+      const raw = baseRows ?? rawRows;
 
-      // derive immediately
-      const transformed = applyRules(rows, headers, buildRules());
+      // 1) transforms with the *current* mapping (or future override)
+      const rules = buildRules(mapping);
+      const transformed = applyRules(raw, headers, rules);
       setRows(transformed);
 
-      const used = new Set<string>();
-      const cols: Mapping[] = headers.map((h, i) => ({
-        map_from: h,
-        name: normalizeHeader(h, i, used),
-        type: inferType(transformed.map(r => r[i])),
-      }));
-      setMapping(cols);
+      // 2) mapping: either keep current, or re-infer if requested
+      let cols = mapping;
+      if (!opts?.keepMapping) {
+        const used = new Set<string>();
+        cols = headers.map((h, i) => ({
+          map_from: h,
+          name: normalizeHeader(h, i, used),
+          type: inferType(transformed.map((r) => r[i])),
+        }));
+        setMapping(cols);
+      }
 
-      const types = cols.map(c => c.type);
+      // 3) validate with whichever mapping we keep/use
+      const types = cols.map((c) => c.type);
       setIssues(validate(transformed, headers, types));
-    } finally {
-      setLoading(false);
-    }
-  }, [buildRules]);
+    },
+    [headers, rawRows, mapping, buildRules]
+  );
+
+  const loadPreview = useCallback(
+    async (
+      spreadsheetId: string,
+      sheetName: string,
+      headerRow: number,
+      maxRows: number
+    ) => {
+      setLoading(true);
+      try {
+        const { headers: H, rows: R } = await fetchPreviewRef.current(
+          spreadsheetId,
+          sheetName,
+          headerRow,
+          maxRows
+        );
+        setHeaders(H);
+        setRawRows(R);
+
+        // First pass: trim only
+        const initialRules: TransformRule[] = trimSpaces
+          ? [{ kind: "trim", columns: H }]
+          : [];
+        const transformed = applyRules(R, H, initialRules);
+        setRows(transformed);
+
+        // Initial mapping (inferred)
+        const used = new Set<string>();
+        const cols: Mapping[] = H.map((h, i) => ({
+          map_from: h,
+          name: normalizeHeader(h, i, used),
+          type: inferType(transformed.map((r) => r[i])),
+        }));
+        setMapping(cols);
+
+        const types = cols.map((c) => c.type);
+        setIssues(validate(transformed, H, types));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [trimSpaces]
+  );
 
   const stats = useMemo(
     () => qualityFromIssues(rows.length, headers.length, issues),
@@ -95,19 +146,27 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
 
   return {
     // data
-    headers, rows, rawRows,
-    mapping, setMapping,
-    issues, stats,
+    headers,
+    rows,
+    rawRows,
+    mapping,
+    setMapping,
+    issues,
+    stats,
 
     // actions
-    loadPreview, recompute,
+    loadPreview,
+    recompute, // accepts opts.keepMapping
 
     // ui state
     loading,
 
     // toggles
-    trimSpaces, setTrimSpaces,
-    normalizeDates, setNormalizeDates,
-    normalizeCurrency, setNormalizeCurrency,
+    trimSpaces,
+    setTrimSpaces,
+    normalizeDates,
+    setNormalizeDates,
+    normalizeCurrency,
+    setNormalizeCurrency,
   };
 }

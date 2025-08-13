@@ -45,11 +45,22 @@ export async function getSheetTabs(spreadsheetId: string) {
   }));
 }
 
+/**
+ * Return formatted strings so dates like 04/08/2025 are not numeric serials (45873).
+ * (valueRenderOption=FORMATTED_VALUE + dateTimeRenderOption=FORMATTED_STRING)
+ */
 export async function getSheetValues(spreadsheetId: string, sheetName: string) {
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/` +
-    encodeURIComponent(`${sheetName}!A:Z`) +
-    "?valueRenderOption=UNFORMATTED_VALUE";
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+    spreadsheetId
+  )}/values/${encodeURIComponent(sheetName)}`;
+
+  const qs = new URLSearchParams({
+    majorDimension: "ROWS",
+    valueRenderOption: "FORMATTED_VALUE",
+    dateTimeRenderOption: "FORMATTED_STRING",
+  });
+
+  const url = `${base}?${qs.toString()}`;
   const res = await authFetch(url);
   const data = await res.json();
   return (data.values ?? []) as string[][];

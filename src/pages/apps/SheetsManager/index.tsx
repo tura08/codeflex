@@ -23,7 +23,7 @@ export default function SheetsManager() {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("");
   const [headerRow, setHeaderRow] = useState(1);
-  const [maxRows, setMaxRows] = useState(50);
+  const [maxRows, setMaxRows] = useState(200);
   const [datasetName, setDatasetName] = useState("");
 
   // Preview pipeline
@@ -99,7 +99,7 @@ export default function SheetsManager() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => recompute(rawRows)}
+              onClick={() => recompute(rawRows, { keepMapping: true })}
               disabled={!sheetName || !!loading || !headers.length}
             >
               Recalculate
@@ -187,9 +187,12 @@ export default function SheetsManager() {
                   datasetName={datasetName}
                   setDatasetName={setDatasetName}
                   rows={rows}
+                  headers={headers}      // <-- add
+                  issues={issues}        // <-- add
                   spreadsheetId={spreadsheetId}
                   sheetName={sheetName}
                   headerRow={headerRow}
+                  onCheckData={() => recompute(rawRows, { keepMapping: true })}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -202,7 +205,6 @@ export default function SheetsManager() {
       </div>
     </div>
   );
-
 }
 
 /**

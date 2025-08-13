@@ -19,11 +19,25 @@ export function useSheets() {
   }
 
   async function fetchPreview(spreadsheetId: string, sheetName: string, headerRow: number, maxRows: number) {
-    const values = await getSheetValues(spreadsheetId, sheetName); // A:Z for now
+    const values = await getSheetValues(spreadsheetId, sheetName); // dynamic width now
     const hIdx = Math.max(1, headerRow) - 1;
-    const headers = (values[hIdx] ?? []).map((h: any) => String(h ?? "").trim() || "Unnamed");
-    const rows = values.slice(hIdx + 1).slice(0, Math.max(1, maxRows));
-    return { headers, rows };
+
+    // 1) headers
+    const headerRaw = (values[hIdx] ?? []) as any[];
+    const headers = headerRaw.map((h) => String(h ?? "").trim() || "Unnamed");
+
+    // 2) rows (normalize each row to headers.length)
+    const width = headers.length;
+    const matrix = values
+      .slice(hIdx + 1)
+      .slice(0, Math.max(1, maxRows))
+      .map((r) => {
+        const out = new Array(width);
+        for (let i = 0; i < width; i++) out[i] = r?.[i] ?? "";
+        return out;
+      });
+
+    return { headers, rows: matrix };
   }
 
   return { loading, fetchSpreadsheets, fetchTabs, fetchPreview };

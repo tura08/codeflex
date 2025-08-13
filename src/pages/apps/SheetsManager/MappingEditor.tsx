@@ -1,11 +1,12 @@
 // src/pages/apps/SheetsManager/MappingEditor.tsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase-client";
 import { coerce, type SimpleType } from "@/lib/google/infer";
 import type { Mapping } from "@/integrations/google/hooks/usePreviewPipeline";
+import type { Issue } from "@/lib/google/sheets-import";
 
 interface Props {
   mapping: Mapping[];
@@ -13,9 +14,12 @@ interface Props {
   datasetName: string;
   setDatasetName: (s: string) => void;
   rows: any[][];
+  headers: string[];
+  issues: Issue[];
   spreadsheetId: string;
   sheetName: string;
   headerRow: number;
+  onCheckData: () => void; // NEW: triggers re-validate w/ current mapping
 }
 
 export function MappingEditor({
@@ -24,14 +28,22 @@ export function MappingEditor({
   datasetName,
   setDatasetName,
   rows,
+  headers,
+  issues,
   spreadsheetId,
   sheetName,
   headerRow,
+  onCheckData,
 }: Props) {
   const [sqlPreview, setSqlPreview] = useState("");
 
+  // header -> index map
+  const colIndex = useMemo(() => new Map(headers.map((h, i) => [h, i])), [headers]);
+
+  const errorCount = useMemo(() => issues.filter(i => i.level === "error").length, [issues]);
+  const warningCount = useMemo(() => issues.filter(i => i.level === "warning").length, [issues]);
+
   async function getOrCreateSourceId(userId: string): Promise<string> {
-    // Try to find an existing source
     const { data: existing, error: qErr } = await supabase
       .from("sheet_sources")
       .select("id")
@@ -45,15 +57,11 @@ export function MappingEditor({
     if (qErr) throw qErr;
     if (existing?.id) return existing.id;
 
-    // Create one if not found (simple fallback name)
     let spreadsheet_name = spreadsheetId;
     try {
-      const { data: file } = await supabase.functions
-        .invoke("lookup-file-name", { body: { spreadsheetId } });
+      const { data: file } = await supabase.functions.invoke("lookup-file-name", { body: { spreadsheetId } });
       if ((file as any)?.name) spreadsheet_name = (file as any).name;
-    } catch {
-      /* ignore, fallback to id */
-    }
+    } catch {}
 
     const { data: created, error: cErr } = await supabase
       .from("sheet_sources")
@@ -71,9 +79,9 @@ export function MappingEditor({
     return created.id as string;
   }
 
-  async function handleCreateDatasetAndImport() {
+  async function handleSaveToDatabase() {
     if (!datasetName.trim()) return alert("Dataset name required");
-    if (!spreadsheetId || !sheetName) return alert("Pick a spreadsheet and tab");
+    if (errorCount > 0) return alert("Fix errors before saving.");
 
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) return alert("Sign in first");
@@ -94,18 +102,23 @@ export function MappingEditor({
     );
     if (e2) return alert(e2.message);
 
-    // 3) rows (preview import)
+    // 3) rows — build typed objects on the fly from current rows + mapping
     const typedRows = rows.map(r => {
       const obj: Record<string, any> = {};
-      mapping.forEach((m, idx) => { obj[m.name] = coerce(r[idx], m.type); });
+      for (const m of mapping) {
+        const i = colIndex.get(m.map_from);
+        const raw = i !== undefined ? r[i] : null;
+        obj[m.name] = coerce(raw, m.type);
+      }
       return { dataset_id: ds.id, data: obj };
     });
+
     if (typedRows.length) {
       const { error: e3 } = await supabase.from("dataset_rows").insert(typedRows);
       if (e3) return alert(e3.message);
     }
 
-    alert(`Dataset created and ${typedRows.length} rows imported.`);
+    alert(`Saved: dataset created and ${typedRows.length} rows inserted.`);
   }
 
   function handleGenerateSQL() {
@@ -134,6 +147,15 @@ ${cols ? cols + ",\n" : ""}  created_at timestamptz default now()
 
   return (
     <div className="space-y-4">
+      {/* Error / warning banner */}
+      {(errorCount > 0 || warningCount > 0) && (
+        <div className={`rounded-md border p-3 text-sm ${errorCount ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-amber-300/60 bg-amber-50 text-amber-800"}`}>
+          {errorCount > 0
+            ? `${errorCount} error${errorCount === 1 ? "" : "s"} detected. Fix mapping or data. Saving is disabled.`
+            : `${warningCount} warning${warningCount === 1 ? "" : "s"} detected.`}
+        </div>
+      )}
+
       {/* Dataset/Table name */}
       <div className="flex items-center gap-2">
         <span className="text-sm">Dataset/Table name:</span>
@@ -178,8 +200,17 @@ ${cols ? cols + ",\n" : ""}  created_at timestamptz default now()
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
-        <Button className="cursor-pointer" onClick={handleCreateDatasetAndImport}>
-          Create Dataset + Import Preview
+        <Button className="cursor-pointer" onClick={onCheckData}>
+          Check Data (re-validate)
+        </Button>
+        <Button
+          variant="default"
+          className="cursor-pointer"
+          onClick={handleSaveToDatabase}
+          disabled={errorCount > 0}
+          title={errorCount > 0 ? "Fix errors before saving" : "Save to database"}
+        >
+          Save to Database
         </Button>
         <Button variant="outline" className="cursor-pointer" onClick={handleGenerateSQL}>
           Generate SQL (CREATE TABLE)

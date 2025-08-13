@@ -49,12 +49,12 @@ export function SourceControls(props: {
               />
             </div>
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Preview rows</label>
+              <label className="text-sm font-medium">Max rows</label>
               <Input
                 type="number"
                 min={1}
                 value={maxRows}
-                onChange={(e) => setMaxRows(Number(e.target.value) || 50)}
+                onChange={(e) => setMaxRows(Number(e.target.value) || 200)}
               />
             </div>
           </div>

@@ -1,4 +1,5 @@
 // src/lib/google/sheets-import.ts
+import { supabase } from "../supabase-client";
 import type { SimpleType } from "./infer";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -11,9 +12,9 @@ export type IssueLevel = "error" | "warning" | "info";
 export type Issue = {
   level: IssueLevel;
   message: string;
-  row: number;       // 0-based row index in preview
-  column: string;    // header name (normalized or original)
-  code: string;      // e.g., DATE_PARSE_FAIL, NUMBER_INVALID
+  row: number;
+  column: string;
+  code: string;
 };
 
 export type QualityStats = {
@@ -22,6 +23,15 @@ export type QualityStats = {
   cells: number;
   errors: number;
   warnings: number;
+};
+
+export type SheetSource = {
+  id: string;
+  user_id: string;
+  spreadsheet_id: string;
+  spreadsheet_name: string;
+  sheet_name: string;
+  header_row: number;
 };
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -45,19 +55,14 @@ function parseCurrencyLoose(input: unknown): number | null {
   let normalized = s;
 
   if (lastComma !== -1 && lastDot !== -1) {
-    // both present → decimal is the rightmost of the two
     if (lastComma > lastDot) {
-      // comma decimal → remove dots (thousands), replace comma with dot
       normalized = s.replace(/\./g, "").replace(",", ".");
     } else {
-      // dot decimal → remove commas (thousands)
       normalized = s.replace(/,/g, "");
     }
   } else if (lastComma !== -1) {
-    // only comma → assume decimal
     normalized = s.replace(/\./g, "").replace(",", ".");
   } else {
-    // only dot or only digits → dot is decimal (or integer)
     normalized = s.replace(/,/g, "");
   }
 
@@ -65,6 +70,7 @@ function parseCurrencyLoose(input: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Parse strings like ISO, dd/mm/yyyy, mm/dd/yyyy. No numeric serial support. */
 function parseDateLoose(v: unknown, dayFirst = true): Date | null {
   if (v === null || v === undefined) return null;
   if (v instanceof Date && !isNaN(v.getTime())) return v;
@@ -76,19 +82,24 @@ function parseDateLoose(v: unknown, dayFirst = true): Date | null {
   const iso = Date.parse(s);
   if (!Number.isNaN(iso)) return new Date(iso);
 
-  // dd/mm/yyyy or mm/dd/yyyy
+  // dd/mm/yyyy or mm/dd/yyyy with preference, fallback to opposite
   const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
   if (m) {
-    let d = parseInt(m[1], 10);
-    let M = parseInt(m[2], 10);
+    const a = parseInt(m[1], 10);
+    const b = parseInt(m[2], 10);
     const y = parseInt(m[3].length === 2 ? `20${m[3]}` : m[3], 10);
-    if (!dayFirst) [d, M] = [M, d];
-    // month is 1..12, day 1..31 (basic sanity)
-    if (M >= 1 && M <= 12 && d >= 1 && d <= 31) {
-      const dt = new Date(Date.UTC(y, M - 1, d));
-      if (!isNaN(dt.getTime())) return dt;
-    }
+
+    const tryOrder = (d: number, M: number, Y: number) => {
+      if (M < 1 || M > 12 || d < 1 || d > 31) return null;
+      const dt = new Date(Date.UTC(Y, M - 1, d));
+      return isNaN(dt.getTime()) ? null : dt;
+    };
+
+    const pref = dayFirst ? tryOrder(a, b, y) : tryOrder(b, a, y);
+    const alt  = dayFirst ? tryOrder(b, a, y) : tryOrder(a, b, y);
+    return pref ?? alt;
   }
+
   return null;
 }
 
@@ -173,9 +184,13 @@ export function validate(
       }
 
       if (t === "date") {
-        const ok = v instanceof Date
-          ? !isNaN(v.getTime())
-          : (typeof v === "string" && !isNaN(Date.parse(v)));
+        let ok = false;
+        if (v instanceof Date && !isNaN(v.getTime())) ok = true;
+        else if (typeof v === "string") {
+          // accept ISO or either dd/mm/yyyy or mm/dd/yyyy
+          ok = !!(parseDateLoose(v, true) || parseDateLoose(v, false));
+        }
+        // NOTE: numeric serials are NOT accepted anymore
         if (!ok) {
           issues.push({ level: "error", message: "Invalid date", row: r, column: headers[i], code: "DATE_PARSE_FAIL" });
         }
@@ -203,4 +218,13 @@ export function qualityFromIssues(rows: number, columns: number, issues: Issue[]
     errors: issues.filter(i => i.level === "error").length,
     warnings: issues.filter(i => i.level === "warning").length,
   };
+}
+
+export async function listSheetSources(): Promise<SheetSource[]> {
+  const { data, error } = await supabase
+    .from("sheet_sources")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
