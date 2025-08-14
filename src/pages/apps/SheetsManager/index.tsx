@@ -1,18 +1,27 @@
 // src/pages/apps/SheetsManager/index.tsx
-import { useMemo, useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { useMemo, useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-import { PreviewTable } from "@/integrations/google/components/SheetsWidgets";
 import { useSheets } from "@/integrations/google/hooks/useSheets";
 import { supabase } from "@/lib/supabase-client";
 
 import { SourceControls } from "./SourceControls";
-import { MappingEditor } from "./MappingEditor";
-import { QualityBar, IssuesPanel } from "./Quality";
 import { usePreviewPipeline, type Mapping as PipeMapping } from "@/integrations/google/hooks/usePreviewPipeline";
+import SheetsTop from "./SheetsTop";
+import PreviewPanel from "./PreviewPanel";
+import MappingPanel from "./MappingPanel";
+
+// sheets sources helper (moved out of this file)
+import { saveSheetSource } from "@/lib/google/sheets-sources";
 
 export type Mapping = PipeMapping;
 
@@ -33,9 +42,13 @@ export default function SheetsManager() {
     issues, stats,
     loadPreview, recompute,
     loading,
-    // trimSpaces, setTrimSpaces,
     normalizeDates, setNormalizeDates,
     normalizeCurrency, setNormalizeCurrency,
+
+    removeEmptyRows, setRemoveEmptyRows,
+    removeMostlyEmptyRows, setRemoveMostlyEmptyRows,
+    mostlyThreshold, setMostlyThreshold,
+    skipped, // { empty, mostly }
   } = usePreviewPipeline(fetchPreview);
 
   // Modal
@@ -46,9 +59,19 @@ export default function SheetsManager() {
     [sheetName]
   );
 
+  // Feedback: rows skipped by empty/mostly-empty filters
+  useEffect(() => {
+    if (skipped.empty || skipped.mostly) {
+      const parts: string[] = [];
+      if (skipped.empty) parts.push(`${skipped.empty} empty`);
+      if (skipped.mostly) parts.push(`${skipped.mostly} mostly-empty`);
+      toast("Rows skipped", { description: parts.join(" · ") });
+    }
+  }, [skipped.empty, skipped.mostly]);
+
   return (
     <div className="space-y-4">
-      {/* Header with Connect button + Transform rules */}
+      {/* Header: title/subtitle + toolbar + Connect dialog trigger */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Sheets Manager</h1>
@@ -56,57 +79,25 @@ export default function SheetsManager() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Transform & Tools Toolbar */}
-          <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-2">
-            {/* Normalize dates */}
-            <label className="flex items-center gap-1 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={normalizeDates}
-                onChange={(e) => setNormalizeDates(e.target.checked)}
-              />
-              Dates
-            </label>
+          <SheetsTop
+            normalizeDates={normalizeDates}
+            setNormalizeDates={setNormalizeDates}
+            normalizeCurrency={normalizeCurrency}
+            setNormalizeCurrency={setNormalizeCurrency}
+            removeEmptyRows={removeEmptyRows}
+            setRemoveEmptyRows={setRemoveEmptyRows}
+            removeMostlyEmptyRows={removeMostlyEmptyRows}
+            setRemoveMostlyEmptyRows={setRemoveMostlyEmptyRows}
+            mostlyThreshold={mostlyThreshold}
+            setMostlyThreshold={setMostlyThreshold}
+            recompute={recompute}
+            rawRows={rawRows}
+            headers={headers}
+            loading={loading}
+            sheetName={sheetName}
+          />
 
-            {/* Parse currency */}
-            <label className="flex items-center gap-1 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={normalizeCurrency}
-                onChange={(e) => setNormalizeCurrency(e.target.checked)}
-              />
-              Currency
-            </label>
-
-            {/* Divider */}
-            <div className="w-px h-5 bg-border mx-1" />
-
-            {/* Placeholder buttons for future features */}
-            <Button variant="ghost" size="sm" disabled title="Coming soon">
-              Trim
-            </Button>
-            <Button variant="ghost" size="sm" disabled title="Coming soon">
-              Dedup
-            </Button>
-            <Button variant="ghost" size="sm" disabled title="Coming soon">
-              Clean
-            </Button>
-
-            {/* Divider */}
-            <div className="w-px h-5 bg-border mx-1" />
-
-            {/* Recalculate */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => recompute(rawRows, { keepMapping: true })}
-              disabled={!sheetName || !!loading || !headers.length}
-            >
-              Recalculate
-            </Button>
-          </div>
-
-          {/* Connect button (unchanged) */}
+          {/* Connect & Load dialog (unchanged, stays here) */}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="cursor-pointer">
@@ -117,6 +108,7 @@ export default function SheetsManager() {
               <DialogHeader>
                 <DialogTitle>Connect Google Sheet</DialogTitle>
               </DialogHeader>
+
               <SourceControls
                 spreadsheetId={spreadsheetId}
                 setSpreadsheetId={setSpreadsheetId}
@@ -133,15 +125,44 @@ export default function SheetsManager() {
                   if (!datasetName) setDatasetName(sheetName);
                   setOpen(false);
                 }}
-                onSaveSource={() => saveAsSource(spreadsheetId, sheetName, headerRow)}
+                onSaveSource={async () => {
+                  if (!spreadsheetId || !sheetName) return alert("Pick a spreadsheet and tab");
+
+                  // Optional pretty name from your Edge Function
+                  const { data: file } = await supabase.functions
+                    .invoke("lookup-file-name", { body: { spreadsheetId } })
+                    .catch(() => ({ data: null as any }));
+
+                  const spreadsheet_name = (file as any)?.name ?? spreadsheetId;
+
+                  try {
+                    await saveSheetSource({
+                      spreadsheetId,
+                      sheetName,
+                      headerRow,
+                      spreadsheetName: spreadsheet_name,
+                    });
+                    alert("Saved as source.");
+                  } catch (e: any) {
+                    alert(e?.message ?? "Failed to save source");
+                  }
+                }}
               />
+
               <Button
                 className="mt-4 w-full"
                 disabled={!spreadsheetId || !sheetName || loading}
                 onClick={async () => {
-                  await loadPreview(spreadsheetId, sheetName, headerRow, maxRows);
-                  if (!datasetName) setDatasetName(sheetName);
-                  setOpen(false);
+                  try {
+                    await loadPreview(spreadsheetId, sheetName, headerRow, maxRows);
+                    if (!datasetName) setDatasetName(sheetName);
+                    setOpen(false);
+                    toast.success("Preview loaded", {
+                      description: `${sheetName} — first ${maxRows} rows`,
+                    });
+                  } catch (e: any) {
+                    toast.error("Failed to load preview", { description: e?.message ?? "Unknown error" });
+                  }
                 }}
               >
                 {loading ? "Loading…" : "Load Preview"}
@@ -157,76 +178,26 @@ export default function SheetsManager() {
       <div className="grid grid-cols-12 gap-4">
         {/* Column A — Preview & Quality */}
         <div className="col-span-12 xl:col-span-8 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-              <CardDescription>
-                First {rows.length} rows — {headers.length} columns
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <QualityBar {...stats} />
-              <PreviewTable headers={headers} rows={rows} />
-              <IssuesPanel issues={issues} />
-            </CardContent>
-          </Card>
+          <PreviewPanel headers={headers} rows={rows} stats={stats} issues={issues} />
         </div>
 
         {/* Column B — Mapping & Import */}
         <div className="col-span-12 xl:col-span-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mapping & Import</CardTitle>
-              <CardDescription>Rename, type, then import</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {mapping.length > 0 ? (
-                <MappingEditor
-                  mapping={mapping}
-                  setMapping={setMapping}
-                  datasetName={datasetName}
-                  setDatasetName={setDatasetName}
-                  rows={rows}
-                  headers={headers}      // <-- add
-                  issues={issues}        // <-- add
-                  spreadsheetId={spreadsheetId}
-                  sheetName={sheetName}
-                  headerRow={headerRow}
-                  onCheckData={() => recompute(rawRows, { keepMapping: true })}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Load a preview to configure mapping.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <MappingPanel
+            mapping={mapping}
+            setMapping={setMapping}
+            datasetName={datasetName}
+            setDatasetName={setDatasetName}
+            rows={rows}
+            headers={headers}
+            issues={issues}
+            spreadsheetId={spreadsheetId}
+            sheetName={sheetName}
+            headerRow={headerRow}
+            onCheckData={() => recompute(rawRows, { keepMapping: true })}
+          />
         </div>
       </div>
     </div>
   );
-}
-
-/**
- * Save the spreadsheet source in Supabase
- */
-async function saveAsSource(spreadsheetId: string, sheetName: string, headerRow: number) {
-  if (!spreadsheetId || !sheetName) return alert("Pick a spreadsheet and tab");
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) return alert("Sign in first");
-
-  const { data: file } = await supabase.functions
-    .invoke("lookup-file-name", { body: { spreadsheetId } })
-    .catch(() => ({ data: null as any }));
-  const spreadsheet_name = (file as any)?.name ?? spreadsheetId;
-
-  const { error } = await supabase.from("sheet_sources").insert({
-    user_id: user.id,
-    spreadsheet_id: spreadsheetId,
-    spreadsheet_name,
-    sheet_name: sheetName,
-    header_row: headerRow,
-  });
-  if (error) return alert(error.message);
-  alert("Saved as source.");
 }

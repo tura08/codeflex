@@ -27,6 +27,18 @@ function pickColumnsByType(mapping: Mapping[], t: SimpleType): string[] {
   return mapping.filter((m) => m.type === t).map((m) => m.map_from);
 }
 
+/* ───────── helpers per “blank” ───────── */
+function isCellBlank(v: unknown) {
+  return v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+}
+function isRowBlank(row: any[]) {
+  return row.every(isCellBlank);
+}
+function isRowMostlyBlank(row: any[], threshold = 0.8) {
+  const blanks = row.filter(isCellBlank).length;
+  return row.length > 0 && blanks / row.length >= threshold;
+}
+
 export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
   const fetchPreviewRef = useRef(fetchPreview);
   fetchPreviewRef.current = fetchPreview;
@@ -39,10 +51,18 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // toggles
+  // toggles (già esistenti)
   const [trimSpaces, setTrimSpaces] = useState(false);
   const [normalizeDates, setNormalizeDates] = useState(false);
   const [normalizeCurrency, setNormalizeCurrency] = useState(false);
+
+  // NEW: skip righe vuote / quasi-vuote
+  const [removeEmptyRows, setRemoveEmptyRows] = useState<boolean>(true);
+  const [removeMostlyEmptyRows, setRemoveMostlyEmptyRows] = useState<boolean>(false);
+  const [mostlyThreshold, setMostlyThreshold] = useState<number>(0.8);
+
+  // NEW: conteggi skip per UI
+  const [skipped, setSkipped] = useState<{ empty: number; mostly: number }>({ empty: 0, mostly: 0 });
 
   const buildRules = useCallback(
     (mappingRef: Mapping[]): TransformRule[] => {
@@ -67,17 +87,45 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
     [headers, trimSpaces, normalizeDates, normalizeCurrency]
   );
 
+  // NEW: funzione che applica gli skip
+  const filterBySkipOptions = useCallback((base: any[][]) => {
+    let empty = 0, mostly = 0;
+    let out = base;
+
+    if (removeEmptyRows) {
+      out = out.filter((r) => {
+        const skip = isRowBlank(r);
+        if (skip) empty += 1;
+        return !skip;
+      });
+    }
+
+    if (removeMostlyEmptyRows) {
+      out = out.filter((r) => {
+        const skip = isRowMostlyBlank(r, mostlyThreshold);
+        if (skip) mostly += 1;
+        return !skip;
+      });
+    }
+
+    setSkipped({ empty, mostly });
+    return out;
+  }, [removeEmptyRows, removeMostlyEmptyRows, mostlyThreshold]);
+
   const recompute = useCallback(
     (baseRows?: any[][], opts?: { keepMapping?: boolean }) => {
       if (!headers.length) return;
       const raw = baseRows ?? rawRows;
 
-      // 1) transforms with the *current* mapping (or future override)
+      // 0) applica skip (undo naturale = togliere i check)
+      const afterSkip = filterBySkipOptions(raw);
+
+      // 1) transforms con mapping corrente
       const rules = buildRules(mapping);
-      const transformed = applyRules(raw, headers, rules);
+      const transformed = applyRules(afterSkip, headers, rules);
       setRows(transformed);
 
-      // 2) mapping: either keep current, or re-infer if requested
+      // 2) mapping
       let cols = mapping;
       if (!opts?.keepMapping) {
         const used = new Set<string>();
@@ -89,11 +137,11 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
         setMapping(cols);
       }
 
-      // 3) validate with whichever mapping we keep/use
+      // 3) validate
       const types = cols.map((c) => c.type);
       setIssues(validate(transformed, headers, types));
     },
-    [headers, rawRows, mapping, buildRules]
+    [headers, rawRows, mapping, buildRules, filterBySkipOptions]
   );
 
   const loadPreview = useCallback(
@@ -114,14 +162,15 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
         setHeaders(H);
         setRawRows(R);
 
-        // First pass: trim only
-        const initialRules: TransformRule[] = trimSpaces
-          ? [{ kind: "trim", columns: H }]
-          : [];
-        const transformed = applyRules(R, H, initialRules);
+        // 0) skip iniziali
+        const base = filterBySkipOptions(R);
+
+        // 1) prima passata: trim opzionale
+        const initialRules: TransformRule[] = trimSpaces ? [{ kind: "trim", columns: H }] : [];
+        const transformed = applyRules(base, H, initialRules);
         setRows(transformed);
 
-        // Initial mapping (inferred)
+        // 2) mapping inferito
         const used = new Set<string>();
         const cols: Mapping[] = H.map((h, i) => ({
           map_from: h,
@@ -130,13 +179,14 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
         }));
         setMapping(cols);
 
+        // 3) validate
         const types = cols.map((c) => c.type);
         setIssues(validate(transformed, H, types));
       } finally {
         setLoading(false);
       }
     },
-    [trimSpaces]
+    [trimSpaces, filterBySkipOptions]
   );
 
   const stats = useMemo(
@@ -161,12 +211,23 @@ export function usePreviewPipeline(fetchPreview: FetchPreviewFn) {
     // ui state
     loading,
 
-    // toggles
+    // toggles (esistenti)
     trimSpaces,
     setTrimSpaces,
     normalizeDates,
     setNormalizeDates,
     normalizeCurrency,
     setNormalizeCurrency,
+
+    // NEW toggles skip
+    removeEmptyRows,
+    setRemoveEmptyRows,
+    removeMostlyEmptyRows,
+    setRemoveMostlyEmptyRows,
+    mostlyThreshold,
+    setMostlyThreshold,
+
+    // NEW conteggi per UI
+    skipped,
   };
 }
