@@ -1,233 +1,124 @@
 // src/pages/apps/SheetsManager/MappingEditor.tsx
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase-client";
-import { coerce, type SimpleType } from "@/lib/google/infer";
+import { type SimpleType } from "@/lib/google/infer";
 import type { Mapping } from "@/integrations/google/hooks/usePreviewPipeline";
 import type { Issue } from "@/lib/google/sheets-import";
 
-interface Props {
+type Props = {
   mapping: Mapping[];
   setMapping: (m: Mapping[]) => void;
   datasetName: string;
-  setDatasetName: (s: string) => void;
+  setDatasetName: (v: string) => void;
   rows: any[][];
   headers: string[];
   issues: Issue[];
-  spreadsheetId: string;
-  sheetName: string;
-  headerRow: number;
-  onCheckData: () => void; // NEW: triggers re-validate w/ current mapping
-}
+  onCheckData: () => void; // triggers re-validate w/ current mapping
+};
 
-export function MappingEditor({
+export default function MappingEditor({
   mapping,
   setMapping,
   datasetName,
   setDatasetName,
-  rows,
-  headers,
   issues,
-  spreadsheetId,
-  sheetName,
-  headerRow,
   onCheckData,
 }: Props) {
-  const [sqlPreview, setSqlPreview] = useState("");
-
-  // header -> index map
-  const colIndex = useMemo(() => new Map(headers.map((h, i) => [h, i])), [headers]);
-
-  const errorCount = useMemo(() => issues.filter(i => i.level === "error").length, [issues]);
-  const warningCount = useMemo(() => issues.filter(i => i.level === "warning").length, [issues]);
-
-  async function getOrCreateSourceId(userId: string): Promise<string> {
-    const { data: existing, error: qErr } = await supabase
-      .from("sheet_sources")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("spreadsheet_id", spreadsheetId)
-      .eq("sheet_name", sheetName)
-      .eq("header_row", headerRow)
-      .limit(1)
-      .maybeSingle();
-
-    if (qErr) throw qErr;
-    if (existing?.id) return existing.id;
-
-    let spreadsheet_name = spreadsheetId;
-    try {
-      const { data: file } = await supabase.functions.invoke("lookup-file-name", { body: { spreadsheetId } });
-      if ((file as any)?.name) spreadsheet_name = (file as any).name;
-    } catch {}
-
-    const { data: created, error: cErr } = await supabase
-      .from("sheet_sources")
-      .insert({
-        user_id: userId,
-        spreadsheet_id: spreadsheetId,
-        spreadsheet_name,
-        sheet_name: sheetName,
-        header_row: headerRow,
-      })
-      .select("id")
-      .single();
-
-    if (cErr) throw cErr;
-    return created.id as string;
-  }
-
-  async function handleSaveToDatabase() {
-    if (!datasetName.trim()) return alert("Dataset name required");
-    if (errorCount > 0) return alert("Fix errors before saving.");
-
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return alert("Sign in first");
-
-    const sourceId = await getOrCreateSourceId(user.id);
-
-    // 1) dataset
-    const { data: ds, error: e1 } = await supabase
-      .from("datasets")
-      .insert({ user_id: user.id, name: datasetName.trim(), source_id: sourceId })
-      .select()
-      .single();
-    if (e1 || !ds) return alert(e1?.message || "Failed to create dataset");
-
-    // 2) columns
-    const { error: e2 } = await supabase.from("dataset_columns").insert(
-      mapping.map(m => ({ dataset_id: ds.id, name: m.name, type: m.type, map_from: m.map_from }))
-    );
-    if (e2) return alert(e2.message);
-
-    // 3) rows — build typed objects on the fly from current rows + mapping
-    const typedRows = rows.map(r => {
-      const obj: Record<string, any> = {};
-      for (const m of mapping) {
-        const i = colIndex.get(m.map_from);
-        const raw = i !== undefined ? r[i] : null;
-        obj[m.name] = coerce(raw, m.type);
-      }
-      return { dataset_id: ds.id, data: obj };
-    });
-
-    if (typedRows.length) {
-      const { error: e3 } = await supabase.from("dataset_rows").insert(typedRows);
-      if (e3) return alert(e3.message);
-    }
-
-    alert(`Saved: dataset created and ${typedRows.length} rows inserted.`);
-  }
-
-  function handleGenerateSQL() {
-    const tbl = datasetName.trim().toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, "_")
-      .replace(/^_+|_+$/g, "");
-    const pgType = (t: SimpleType) =>
-      t === "number" ? "numeric" :
-      t === "boolean" ? "boolean" :
-      t === "date" ? "timestamptz" : "text";
-
-    const cols = mapping.map(m => `  "${m.name}" ${pgType(m.type)}`).join(",\n");
-    const sql =
-`create table if not exists public."${tbl}" (
-  id uuid primary key default gen_random_uuid(),
-${cols ? cols + ",\n" : ""}  created_at timestamptz default now()
-);`;
-    setSqlPreview(sql);
-  }
-
-  function handleCopySQL() {
-    if (!sqlPreview) return;
-    navigator.clipboard.writeText(sqlPreview);
-    alert("SQL copied");
-  }
+  const errorCount = useMemo(() => issues.filter((i) => i.level === "error").length, [issues]);
+  const warningCount = useMemo(() => issues.filter((i) => i.level === "warning").length, [issues]);
 
   return (
-    <div className="space-y-4">
-      {/* Error / warning banner */}
-      {(errorCount > 0 || warningCount > 0) && (
-        <div className={`rounded-md border p-3 text-sm ${errorCount ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-amber-300/60 bg-amber-50 text-amber-800"}`}>
-          {errorCount > 0
-            ? `${errorCount} error${errorCount === 1 ? "" : "s"} detected. Fix mapping or data. Saving is disabled.`
-            : `${warningCount} warning${warningCount === 1 ? "" : "s"} detected.`}
-        </div>
-      )}
+    <Card>
+      <CardHeader>
+        <CardTitle>Mapping</CardTitle>
+        <CardDescription>
+          Rename columns and set types. Use “Check Data” to re-validate.
+        </CardDescription>
+      </CardHeader>
 
-      {/* Dataset/Table name */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm">Dataset/Table name:</span>
-        <Input
-          className="w-[360px]"
-          value={datasetName}
-          onChange={(e) => setDatasetName(e.target.value)}
-        />
-      </div>
-
-      {/* Column mapping */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {mapping.map((m, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            <Input
-              className="w-48"
-              value={m.name}
-              onChange={(e) =>
-                setMapping(mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))
-              }
-            />
-            <Select
-              value={m.type}
-              onValueChange={(v) =>
-                setMapping(mapping.map((x, i) => (i === idx ? { ...x, type: v as SimpleType } : x)))
-              }
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="string">string</SelectItem>
-                <SelectItem value="number">number</SelectItem>
-                <SelectItem value="boolean">boolean</SelectItem>
-                <SelectItem value="date">date</SelectItem>
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground">← {m.map_from}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button className="cursor-pointer" onClick={onCheckData}>
-          Check Data (re-validate)
-        </Button>
-        <Button
-          variant="default"
-          className="cursor-pointer"
-          onClick={handleSaveToDatabase}
-          disabled={errorCount > 0}
-          title={errorCount > 0 ? "Fix errors before saving" : "Save to database"}
-        >
-          Save to Database
-        </Button>
-        <Button variant="outline" className="cursor-pointer" onClick={handleGenerateSQL}>
-          Generate SQL (CREATE TABLE)
-        </Button>
-        {!!sqlPreview && (
-          <Button variant="secondary" className="cursor-pointer" onClick={handleCopySQL}>
-            Copy SQL
+      <CardContent className="space-y-4">
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2">
+          <Button className="cursor-pointer" onClick={onCheckData}>
+            Check Data (re-validate)
           </Button>
-        )}
-      </div>
+        </div>
 
-      {/* SQL Preview */}
-      {!!sqlPreview && (
-        <pre className="mt-2 whitespace-pre-wrap rounded bg-muted p-3 text-xs">
-          {sqlPreview}
-        </pre>
-      )}
-    </div>
+        {/* Error / warning banner */}
+        {(errorCount > 0 || warningCount > 0) && (
+          <div
+            className={`rounded-md border p-3 text-sm ${
+              errorCount
+                ? "border-destructive/50 bg-destructive/10 text-destructive"
+                : "border-amber-300/60 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {errorCount > 0
+              ? `${errorCount} error${errorCount === 1 ? "" : "s"} detected. Fix mapping or data.`
+              : `${warningCount} warning${warningCount === 1 ? "" : "s"} detected.`}
+          </div>
+        )}
+
+        {/* Dataset/Table label (UX label only) */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm">Dataset label:</span>
+          <Input
+            className="w-[360px]"
+            value={datasetName}
+            onChange={(e) => setDatasetName(e.target.value)}
+            placeholder="e.g., supplier_orders"
+          />
+        </div>
+
+        {/* Column mapping */}
+        {mapping.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {mapping.map((m, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  className="w-48"
+                  value={m.name}
+                  onChange={(e) =>
+                    setMapping(
+                      mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x))
+                    )
+                  }
+                />
+                <Select
+                  value={m.type}
+                  onValueChange={(v) =>
+                    setMapping(
+                      mapping.map((x, i) =>
+                        i === idx ? { ...x, type: v as SimpleType } : x
+                      )
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="string">string</SelectItem>
+                    <SelectItem value="number">number</SelectItem>
+                    <SelectItem value="boolean">boolean</SelectItem>
+                    <SelectItem value="date">date</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground">
+                  mapped from: <code>{m.map_from}</code>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Load a preview to configure mapping.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

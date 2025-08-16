@@ -116,20 +116,6 @@ export default function SheetsTop(props: SheetsTopProps) {
       {/* Divider */}
       <div className="w-px h-5 bg-border mx-1" />
 
-      {/* Placeholder buttons for future features */}
-      <Button variant="ghost" size="sm" disabled title="Coming soon">
-        Trim
-      </Button>
-      <Button variant="ghost" size="sm" disabled title="Coming soon">
-        Dedup
-      </Button>
-      <Button variant="ghost" size="sm" disabled title="Coming soon">
-        Clean
-      </Button>
-
-      {/* Divider */}
-      <div className="w-px h-5 bg-border mx-1" />
-
       {/* Recalculate (no toast by request) */}
       <Button
         variant="outline"

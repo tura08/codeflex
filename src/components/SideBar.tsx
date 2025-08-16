@@ -30,16 +30,8 @@ export function SideBar() {
 
   return (
     <Sidebar side="left" variant="sidebar" className="bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="py-4">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink to="/">
-                <span className="text-xl font-bold">CodeFlex</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="py-4 text-center">
+        <span className="text-2xl font-bold">CodeFlex</span>
       </SidebarHeader>
 
       <SidebarContent>

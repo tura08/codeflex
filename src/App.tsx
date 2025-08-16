@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import { Toaster } from "@/components/ui/sonner"; // <= use alias if available
+import { Toaster } from "@/components/ui/sonner";
 
 import { SideBar } from "@/components/SideBar";
 import { NavBar } from "@/components/NavBar";
