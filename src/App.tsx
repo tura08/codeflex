@@ -15,6 +15,8 @@ import Dashboard from "@/pages/Dashboard";
 import LoginPage from "@/pages/Login";
 import SignupPage from "@/pages/Signup";
 import SheetsManager from "@/pages/apps/SheetsManager/index";
+import Datasets from "@/pages/apps/SheetsManager/datasets/Datasets";
+import DatasetDetail from "@/pages/apps/SheetsManager/datasets/DatasetDetail";
 
 export default function App() {
   return (
@@ -41,6 +43,9 @@ export default function App() {
                       <Route path="/apps/new" element={<NewApp />} />
                       <Route path="/apps/:id" element={<AppDetails />} />
                       <Route path="/apps/sheetsmanager" element={<SheetsManager />} />
+                      <Route path="/apps/sheetsmanager/datasets" element={<Datasets />} />
+                      <Route path="/apps/sheetsmanager/datasets/:id" element={<DatasetDetail />} />
+
                       <Route path="/settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>

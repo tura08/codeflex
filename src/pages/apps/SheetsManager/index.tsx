@@ -30,6 +30,7 @@ import type { GroupingConfig } from "@/lib/google/grouping";
 import { saveSheetSource, getOrCreateSheetSource } from "@/lib/google/sheets-sources";
 import { createDatasetWithSource, saveDatasetColumns } from "@/lib/google/datasets";
 import { appendImportSingleTable } from "@/lib/google/append-import";
+import { Link } from "react-router-dom";
 
 export type Mapping = PipeMapping;
 
@@ -199,7 +200,18 @@ export default function SheetsManager() {
             ) : null}
           </p>
         </div>
+        {/* Navigation between import data and browse data */}
+        <div className="hidden md:flex items-center gap-2">
+          <Link to="/apps/sheetsmanager" className="cursor-pointer">
+            <Button variant="outline">Import Workbench</Button>
+          </Link>
+          <Link to="/apps/sheetsmanager/datasets" className="cursor-pointer">
+            <Button>Dataset Browser</Button>
+          </Link>
+        </div>
 
+
+        {/* Top bar for applying changes */}
         <div className="flex items-center gap-4">
           <SheetsTop
             normalizeDates={normalizeDates}
