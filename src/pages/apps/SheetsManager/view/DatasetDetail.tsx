@@ -1,6 +1,6 @@
 // src/pages/apps/SheetsManager/datasets/DatasetDetail.tsx
 import { useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/dialog";
 
 import { useDatasetDetail, removeDataset } from "@/integrations/google/hooks/useDatasetBrowser";
-import DatasetHeader from "./components/DatasetHeader";
-import DataTable from "./components/DataTable";
+import DatasetHeader from "./DatasetHeader";
+import DataTable from "./DataTable";
+
 
 export default function DatasetDetail() {
   const { id: routeId } = useParams();
@@ -57,12 +58,6 @@ export default function DatasetDetail() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{dataset?.name ?? "Dataset"}</h1>
         <div className="flex gap-2">
-          <Link to="/apps/sheetsmanager">
-            <Button variant="outline">Import Workbench</Button>
-          </Link>
-          <Link to="/apps/sheetsmanager/datasets">
-            <Button>Dataset Browser</Button>
-          </Link>
 
           {/* Delete dataset */}
           <Dialog open={openDelete} onOpenChange={setOpenDelete}>

@@ -10,7 +10,7 @@ export default function DatasetList({ loading, datasets }: { loading: boolean; d
       {datasets.map((d) => (
         <Link
           key={d.id}
-          to={`/apps/sheetsmanager/datasets/${d.id}`}
+          to={`/apps/sheetsmanager/view/datasets/${d.id}`}
           className="rounded-xl border p-4 hover:bg-muted/40 transition"
         >
           <div className="font-medium">{d.name}</div>

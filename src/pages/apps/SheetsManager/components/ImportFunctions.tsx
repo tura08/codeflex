@@ -1,33 +1,27 @@
 import { Button } from "@/components/ui/button";
 
-type SheetsTopProps = {
-  // toggles
+export type ImportFunctionsProps = {
   normalizeDates: boolean;
   setNormalizeDates: (v: boolean) => void;
-
   normalizeCurrency: boolean;
   setNormalizeCurrency: (v: boolean) => void;
-
   removeEmptyRows: boolean;
   setRemoveEmptyRows: (v: boolean) => void;
-
   removeMostlyEmptyRows: boolean;
   setRemoveMostlyEmptyRows: (v: boolean) => void;
-
-  mostlyThreshold: number; // 0.5..0.95
+  mostlyThreshold: number;
   setMostlyThreshold: (v: number) => void;
 
-  // pipeline
-  recompute: (baseRows?: any[][], opts?: { keepMapping?: boolean }) => void;
-
-  // context needed for disabling/behavior
-  rawRows: any[][];
+  // widen these two to avoid arg-shape mismatch
+  recompute: (baseRows?: any[] | any[][], opts?: { keepMapping?: boolean }) => void;
+  rawRows: any[] | any[][];
   headers: string[];
   loading: boolean;
   sheetName: string;
 };
 
-export default function SheetsTop(props: SheetsTopProps) {
+
+export default function ImportFunctions(props: ImportFunctionsProps) {
   const {
     normalizeDates, setNormalizeDates,
     normalizeCurrency, setNormalizeCurrency,
