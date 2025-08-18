@@ -1,12 +1,15 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useTopBarActions } from "../layout/SheetsShell";
-import { useImportController } from "../import/ImportController";
 import ConnectDialog from "./ConnectDialog";
+import { useImportController } from "./ImportControllerContext";
 
 /** Inline toolbar mounted once into the shell header. */
 function ToolbarInline() {
-  const { openConnect, save, saving, records } = useImportController();
+  const controller = useImportController();
+  const openConnect = controller.dialog.openConnect;
+  const { saving, run: save } = controller.save;
+  const { records } = controller.dataset;
 
   return (
     <>
@@ -27,7 +30,6 @@ function ToolbarInline() {
 export default function TopActionsImport() {
   const setTop = useTopBarActions();
 
-  // Mount the toolbar once. No deps besides setTop to avoid loops.
   useEffect(() => {
     setTop(<ToolbarInline />);
     return () => setTop(null);

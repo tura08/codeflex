@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { type SimpleType } from "@/lib/google/infer";
-import type { Mapping } from "@/integrations/google/hooks/usePreviewPipeline";
+import type { Mapping } from "../hooks/useImportController";
 import type { Issue } from "@/lib/google/sheets-import";
 
 type Props = {
@@ -12,10 +12,8 @@ type Props = {
   setMapping: (m: Mapping[]) => void;
   datasetName: string;
   setDatasetName: (v: string) => void;
-  rows: any[][];
-  headers: string[];
   issues: Issue[];
-  onCheckData: () => void; // triggers re-validate w/ current mapping
+  onCheckData: () => void;
 };
 
 export default function MappingEditor({
@@ -38,7 +36,6 @@ export default function MappingEditor({
         </CardDescription>
       </CardHeader>
 
-      {/* Body fills the card; internal scroll only for the long list */}
       <CardContent className="flex-1 min-h-0 flex flex-col gap-3 pt-0">
         {/* Actions (non-scrolling) */}
         <div className="flex flex-wrap gap-2">
@@ -83,18 +80,14 @@ export default function MappingEditor({
                     className="w-44"
                     value={m.name}
                     onChange={(e) =>
-                      setMapping(
-                        mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x))
-                      )
+                      setMapping(mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)))
                     }
                   />
                   <Select
                     value={m.type}
                     onValueChange={(v) =>
                       setMapping(
-                        mapping.map((x, i) =>
-                          i === idx ? { ...x, type: v as SimpleType } : x
-                        )
+                        mapping.map((x, i) => (i === idx ? { ...x, type: v as SimpleType } : x))
                       )
                     }
                   >

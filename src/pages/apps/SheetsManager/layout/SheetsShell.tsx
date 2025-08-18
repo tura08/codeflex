@@ -1,7 +1,7 @@
 // src/pages/apps/SheetsManager/layout/SheetsShell.tsx
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ImportControllerProvider } from "../import/ImportController";
+import { ImportControllerProvider } from "../import/ImportControllerContext";
 
 type TopBarActionsCtx = { setTopBarActions: (node: React.ReactNode | null) => void };
 const TopBarCtx = createContext<TopBarActionsCtx | null>(null);
@@ -68,7 +68,6 @@ export default function SheetsShell() {
 
   return (
     <TopBarCtx.Provider value={value}>
-      {/* Provider wraps the entire shell so header-mounted components are always safe */}
       <ImportControllerProvider>{ShellBody}</ImportControllerProvider>
     </TopBarCtx.Provider>
   );

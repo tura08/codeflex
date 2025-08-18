@@ -1,3 +1,4 @@
+// src/components/SideBar.tsx
 import { NavLink, useLocation } from "react-router-dom"
 import {
   Sidebar,
@@ -16,13 +17,15 @@ import {
   SlidersHorizontal,
   AppWindowMac,
   Settings as SettingsIcon,
+  Table,
 } from "lucide-react"
 
 const items = [
-  { title: "Dashboard", url: "/",        icon: LayoutDashboard },
-  { title: "Analyse",   url: "/analyse", icon: SlidersHorizontal },
-  { title: "Apps",      url: "/apps",    icon: AppWindowMac },
-  { title: "Settings",  url: "/settings",icon: SettingsIcon },
+  { title: "Dashboard",      url: "/",                   icon: LayoutDashboard },
+  { title: "Analyse",        url: "/analyse",            icon: SlidersHorizontal },
+  { title: "Apps",           url: "/apps",               icon: AppWindowMac },
+  { title: "Sheets Manager", url: "/apps/sheetsmanager", icon: Table },
+  { title: "Settings",       url: "/settings",           icon: SettingsIcon },
 ]
 
 export function SideBar() {
@@ -61,7 +64,6 @@ export function SideBar() {
             })}
           </SidebarMenu>
         </SidebarGroup>
-
       </SidebarContent>
 
       <SidebarFooter>{/* optional footer content */}</SidebarFooter>

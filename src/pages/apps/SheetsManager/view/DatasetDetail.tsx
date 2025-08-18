@@ -15,7 +15,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-import { useDatasetDetail, removeDataset } from "@/integrations/google/hooks/useDatasetBrowser";
+import { useDatasetDetail, removeDataset } from "@/pages/apps/SheetsManager/hooks/useDatasetBrowser";
 import DatasetHeader from "./DatasetHeader";
 import DataTable from "./DataTable";
 

@@ -1,7 +1,6 @@
-// src/lib/google/datasets.ts
 import { supabase } from "@/lib/supabase-client";
 import type { GroupingConfig } from "@/lib/google/grouping";
-import type { Mapping } from "@/integrations/google/hooks/usePreviewPipeline";
+import type { Mapping } from "@/integrations/google/types";
 
 async function getUserId() {
   const { data } = await supabase.auth.getUser();
@@ -10,31 +9,20 @@ async function getUserId() {
   return uid;
 }
 
-/**
- * Create a dataset row with a name (your table has NOT NULL on "name").
- * If your column is named differently (e.g., dataset_name), rename below accordingly.
- */
+/** Create a dataset row with a safe name */
 export async function createDatasetMinimal(name?: string): Promise<{ id: string }> {
   const user_id = await getUserId();
-  const safe =
-    (name ?? "").trim() || `dataset_${new Date().toISOString().replace(/[:.]/g, "-")}`;
-
+  const safe = (name ?? "").trim() || `dataset_${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const { data, error } = await supabase
     .from("datasets")
     .insert({ user_id, name: safe })
     .select("id")
     .single();
-
   if (error) throw error;
   return { id: data.id as string };
 }
 
-
-/**
- * NEW: create a dataset satisfying NOT NULL on "name" and "source_id"
- * Optionally set grouping flags on creation.
- * If your column names differ, rename keys accordingly here.
- */
+/** Create a dataset with source + optional grouping flags */
 export async function createDatasetWithSource(params: {
   name: string;
   source_id: string;
@@ -42,9 +30,7 @@ export async function createDatasetWithSource(params: {
   grouping_config?: GroupingConfig | null;
 }): Promise<{ id: string }> {
   const user_id = await getUserId();
-  const safe =
-    (params.name ?? "").trim() || `dataset_${new Date().toISOString().replace(/[:.]/g, "-")}`;
-
+  const safe = (params.name ?? "").trim() || `dataset_${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const { data, error } = await supabase
     .from("datasets")
     .insert({
@@ -56,11 +42,9 @@ export async function createDatasetWithSource(params: {
     })
     .select("id")
     .single();
-
   if (error) throw error;
   return { id: data.id as string };
 }
-
 
 export async function getGroupingConfigById(datasetId: string): Promise<{
   enabled: boolean;
@@ -71,7 +55,6 @@ export async function getGroupingConfigById(datasetId: string): Promise<{
     .select("grouping_enabled, grouping_config")
     .eq("id", datasetId)
     .maybeSingle();
-
   if (error) throw error;
   return {
     enabled: !!data?.grouping_enabled,
@@ -86,7 +69,6 @@ export async function saveGroupingConfigById(params: {
 }): Promise<string> {
   const user_id = await getUserId();
   const { datasetId, enabled, config } = params;
-
   const { data, error } = await supabase
     .from("datasets")
     .update({
@@ -98,7 +80,6 @@ export async function saveGroupingConfigById(params: {
     .eq("user_id", user_id)
     .select("id")
     .single();
-
   if (error) throw error;
   return data.id as string;
 }

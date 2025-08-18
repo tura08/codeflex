@@ -1,26 +1,30 @@
+// src/pages/apps/SheetsManager/import/Workbench.tsx
 import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import ImportFunctions from "../components/ImportFunctions";
+import ImportFunctions from "./ImportFunctions";
 import GroupingView from "./GroupingView";
 import MappingEditor from "./MappingEditor";
-import { useImportController } from "./ImportController";
 import { toast } from "sonner";
 import PreviewPanel from "./PreviewPanel";
+import { useImportController } from "./ImportControllerContext";
 
 export default function Workbench() {
-  const {
-    headers, rows, rawRows, mapping, setMapping, issues, stats,
-    recompute, loading, normalizeDates, setNormalizeDates,
-    normalizeCurrency, setNormalizeCurrency,
-    removeEmptyRows, setRemoveEmptyRows,
-    removeMostlyEmptyRows, setRemoveMostlyEmptyRows,
-    mostlyThreshold, setMostlyThreshold,
-    skipped, sheetName, datasetName, setDatasetName,
-    records, availableFields,
-    groupingEnabled, setGroupingEnabled,
-    groupingConfig, setGroupingConfig,
-  } = useImportController();
+  const controller = useImportController();
 
+  // Pipeline
+  const { headers, rows, rawRows, mapping, issues, stats } = controller.pipeline.data;
+  const { setMapping } = controller.pipeline.setRules;
+  const { recompute } = controller.pipeline.actions;
+  const { skipped } = controller.pipeline;
+
+  // Source / dataset
+  const { sheetName, datasetName, setDatasetName } = controller.source;
+  const { records } = controller.dataset;
+
+  // Grouping (display only here)
+  const { enabled: groupingEnabled, config: groupingConfig } = controller.grouping;
+
+  // Local UI state
   const [view, setView] = useState<"workbench" | "grouping">("workbench");
 
   const subtitle = useMemo(
@@ -40,15 +44,7 @@ export default function Workbench() {
   if (view === "grouping") {
     return (
       <GroupingView
-        records={records}
-        fields={availableFields}
-        initialEnabled={groupingEnabled}
-        initialConfig={groupingConfig}
-        onClose={(res) => {
-          if (res) {
-            setGroupingEnabled(res.enabled);
-            setGroupingConfig(res.config ?? null);
-          }
+        onClose={() => {
           setView("workbench");
         }}
       />
@@ -71,25 +67,9 @@ export default function Workbench() {
           </p>
         </div>
 
-        {/* Right: rules + Grouping (kept here) */}
+        {/* Right: rules + Grouping */}
         <div className="flex items-center gap-4">
-          <ImportFunctions
-            normalizeDates={normalizeDates}
-            setNormalizeDates={setNormalizeDates}
-            normalizeCurrency={normalizeCurrency}
-            setNormalizeCurrency={setNormalizeCurrency}
-            removeEmptyRows={removeEmptyRows}
-            setRemoveEmptyRows={setRemoveEmptyRows}
-            removeMostlyEmptyRows={removeMostlyEmptyRows}
-            setRemoveMostlyEmptyRows={setRemoveMostlyEmptyRows}
-            mostlyThreshold={mostlyThreshold}
-            setMostlyThreshold={setMostlyThreshold}
-            recompute={recompute}
-            rawRows={rawRows}
-            headers={headers}
-            loading={loading}
-            sheetName={sheetName}
-          />
+          <ImportFunctions />
           <Button
             variant="outline"
             className="cursor-pointer"
@@ -112,8 +92,6 @@ export default function Workbench() {
             setMapping={setMapping}
             datasetName={datasetName}
             setDatasetName={setDatasetName}
-            rows={rows}
-            headers={headers}
             issues={issues}
             onCheckData={() => recompute(rawRows, { keepMapping: true })}
           />

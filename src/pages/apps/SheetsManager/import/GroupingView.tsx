@@ -1,159 +1,120 @@
 // src/pages/apps/SheetsManager/import/GroupingView.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { groupRecords, inferParentChildRoles, type GroupingConfig } from "@/lib/google/grouping";
+import { useImportController } from "./ImportControllerContext";
 
-type Props = {
-  records: Record<string, any>[];
-  fields: string[];
-  initialEnabled?: boolean;
-  initialConfig?: GroupingConfig | null;
-  onClose: (result?: { enabled: boolean; config: GroupingConfig | null }) => void;
-};
+type Props = { onClose?: () => void };
 
-export default function GroupingView({
-  records,
-  fields,
-  initialEnabled,
-  initialConfig,
-  onClose,
-}: Props) {
-  // local state
-  const [enabled, setEnabled] = useState<boolean>(!!initialEnabled);
-  const [config, setConfig] = useState<GroupingConfig | null>(initialConfig ?? null);
+export default function GroupingView({ onClose }: Props) {
+  const controller = useImportController();
 
-  // panel (merged) state
-  const [groupBy, setGroupBy] = useState<string[]>(initialConfig?.groupBy ?? []);
-  const [parentFields, setParentFields] = useState<string[]>(initialConfig?.parentFields ?? []);
-  const [childFields, setChildFields] = useState<string[]>(
-    initialConfig?.childFields ??
-      fields.filter((f) => !groupBy.includes(f) && !parentFields.includes(f))
+  // Data
+  const { records, availableFields: allFields } = controller.dataset;
+  const { config: savedConfig } = controller.grouping;
+
+  // Initial keys (saved or first field)
+  const initialKeys: string[] =
+    savedConfig?.groupBy?.length ? savedConfig.groupBy : allFields[0] ? [allFields[0]] : [];
+
+  // Local state
+  const [groupKeys, setGroupKeys] = useState<string[]>(initialKeys);
+  const [searchGroupKeys, setSearchGroupKeys] = useState("");
+  const [searchRoles, setSearchRoles] = useState("");
+  const [showAllParents, setShowAllParents] = useState(false);
+  const [showAllChildren, setShowAllChildren] = useState(false);
+
+  // Filtered key options
+  const visibleGroupKeyOptions = useMemo(
+    () =>
+      allFields.filter((field) =>
+        field.toLowerCase().includes(searchGroupKeys.toLowerCase())
+      ),
+    [allFields, searchGroupKeys]
   );
 
-  // keep initial props in sync if parent reopens with new defaults
-  useEffect(() => {
-    setEnabled(!!initialEnabled);
-    setConfig(initialConfig ?? null);
-    setGroupBy(initialConfig?.groupBy ?? []);
-    setParentFields(initialConfig?.parentFields ?? []);
-    setChildFields(
-      initialConfig?.childFields ??
-        fields.filter((f) => !initialConfig?.groupBy?.includes(f ?? "") && !initialConfig?.parentFields?.includes(f ?? ""))
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialEnabled, initialConfig, fields.join("|")]);
+  // Auto-infer roles from selected keys (pure)
+  const derivedRoles = useMemo(() => {
+    if (!groupKeys.length || !records.length) {
+      return { parentFields: [] as string[], childFields: [] as string[] };
+    }
+    return inferParentChildRoles(records, groupKeys, allFields);
+  }, [groupKeys, records, allFields]);
 
-  // auto-infer roles when enabled + groupBy changes
-  useEffect(() => {
-    if (!enabled || groupBy.length === 0 || records.length === 0) return;
-    const { parentFields: p, childFields: c } = inferParentChildRoles(records, groupBy, fields);
-    setParentFields(p);
-    setChildFields(c);
-  }, [enabled, groupBy, records, fields]);
-
-  // derived cfg + preview
-  const cfg: GroupingConfig = useMemo(
-    () => ({ groupBy, parentFields, childFields }),
-    [groupBy, parentFields, childFields]
+  // Center list (exclude keys, filter by search)
+  const visibleRoleFields = useMemo(
+    () =>
+      allFields
+        .filter((f) => !groupKeys.includes(f))
+        .filter((f) => f.toLowerCase().includes(searchRoles.toLowerCase())),
+    [allFields, groupKeys, searchRoles]
   );
 
-  const preview = useMemo(() => {
-    if (!enabled || !groupBy.length || !records.length) {
+  // Current config + preview
+  const currentConfig: GroupingConfig = useMemo(
+    () => ({
+      groupBy: groupKeys,
+      parentFields: derivedRoles.parentFields,
+      childFields: derivedRoles.childFields,
+    }),
+    [groupKeys, derivedRoles.parentFields, derivedRoles.childFields]
+  );
+
+  const previewData = useMemo(() => {
+    if (!groupKeys.length || !records.length) {
       return { parents: [], children: [], stats: { groups: 0, parents: 0, children: 0 } };
     }
-    return groupRecords(records, cfg);
-  }, [enabled, groupBy, records, cfg]);
+    return groupRecords(records, currentConfig);
+  }, [groupKeys, records, currentConfig]);
 
-  // bubble up only when enabled (avoids toggling loops)
-  useEffect(() => {
-    if (enabled) setConfig(cfg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, cfg.groupBy.join("|"), cfg.parentFields.join("|"), cfg.childFields.join("|")]);
+  const hasRecords = records.length > 0;
+  const canApply = hasRecords && groupKeys.length > 0;
 
-  // ui helpers
-  const [qKeys, setQKeys] = useState("");
-  const [qRoles, setQRol] = useState("");
+  // Handlers
+  const toggleGroupKey = (field: string) => {
+    setGroupKeys((prev) =>
+      prev.includes(field) ? prev.filter((x) => x !== field) : [...prev, field]
+    );
+  };
+  const clearAllKeys = () => setGroupKeys([]);
 
-  const filtKeys = useMemo(
-    () => fields.filter((f) => f.toLowerCase().includes(qKeys.toLowerCase())),
-    [fields, qKeys]
-  );
-
-  const nonKeyFields = useMemo(
-    () => fields.filter((f) => !groupBy.includes(f) && f.toLowerCase().includes(qRoles.toLowerCase())),
-    [fields, groupBy, qRoles]
-  );
-
-  const toggleKey = (f: string) => {
-    const next = groupBy.includes(f) ? groupBy.filter((x) => x !== f) : [...groupBy, f];
-    setGroupBy(next);
+  const applyAndClose = () => {
+    controller.grouping.setEnabled(true);
+    controller.grouping.setConfig(currentConfig);
+    onClose?.();
   };
 
-  const setRole = (f: string, role: "parent" | "child") => {
-    if (role === "parent") {
-      if (!parentFields.includes(f)) setParentFields([...parentFields, f]);
-      setChildFields(childFields.filter((x) => x !== f));
-    } else {
-      if (!childFields.includes(f)) setChildFields([...childFields, f]);
-      setParentFields(parentFields.filter((x) => x !== f));
-    }
-  };
-
-  const clearAll = () => {
-    setGroupBy([]);
-    setParentFields([]);
-    setChildFields(fields);
-  };
-
-  const haveData = records.length > 0;
+  // Preview slices
+  const parentsPreview = showAllParents ? previewData.parents : previewData.parents.slice(0, 5);
+  const childrenPreview = showAllChildren ? previewData.children : previewData.children.slice(0, 5);
 
   return (
     <div className="space-y-3">
-      {/* Header row (no Card wrapper here) */}
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-base font-semibold">Grouping</h1>
           <div className="text-sm text-muted-foreground">
-            Pick <b>group keys</b> (e.g., order_id). Remaining fields get a <b>Parent</b> or <b>Child</b> role.
-            {enabled && (
-              <div className="text-xs mt-1">
-                {preview.stats.groups} groups · {preview.stats.parents} parents · {preview.stats.children} children
-              </div>
-            )}
+            Select one or more <b>group keys</b> (e.g., order_id). Parent/Child roles are inferred automatically.
+            <div className="text-xs mt-1">
+              {groupKeys.length
+                ? `${previewData.stats.groups} groups · ${previewData.stats.parents} parents · ${previewData.stats.children} children`
+                : "Pick at least one key to preview"}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Switch id="grp-enabled" checked={enabled} onCheckedChange={setEnabled} />
-            <Label htmlFor="grp-enabled" className="text-sm">Enable</Label>
-          </div>
-
-          <Separator orientation="vertical" className="h-6" />
-
-          <Button variant="outline" onClick={() => onClose()}>
-            ← Back
-          </Button>
-          <Button
-            disabled={!haveData}
-            onClick={() =>
-              onClose({
-                enabled,
-                config: enabled ? (config ?? { groupBy: [], parentFields: [], childFields: [] }) : null,
-              })
-            }
-          >
-            Apply
-          </Button>
+          <Button variant="outline" onClick={onClose}>← Back</Button>
+          <Button disabled={!canApply} onClick={applyAndClose}>Apply</Button>
         </div>
       </div>
 
-      {/* Work area: fixed height; columns scroll internally */}
+      {/* Work area */}
       <div className="h-[66vh] grid grid-cols-12 gap-3 overflow-hidden">
         {/* KEYS (left) */}
         <Card className="col-span-12 lg:col-span-4 flex flex-col min-h-0 overflow-hidden">
@@ -161,8 +122,8 @@ export default function GroupingView({
             <div className="p-2 flex items-center justify-between gap-2">
               <Label className="text-sm">Group by (keys)</Label>
               <Input
-                value={qKeys}
-                onChange={(e) => setQKeys(e.target.value)}
+                value={searchGroupKeys}
+                onChange={(e) => setSearchGroupKeys(e.target.value)}
                 placeholder="Search"
                 className="h-8 w-36"
               />
@@ -170,34 +131,46 @@ export default function GroupingView({
             <Separator />
             <div className="p-2 overflow-auto text-xs flex-1 min-h-0">
               <div className="grid grid-cols-1 gap-1">
-                {filtKeys.map((f) => (
+                {visibleGroupKeyOptions.map((field) => (
                   <label
-                    key={`gb-${f}`}
+                    key={`gb-${field}`}
                     className="flex items-center gap-2 rounded border px-2 py-1 cursor-pointer hover:bg-muted/60"
-                    title={f}
+                    title={field}
                   >
-                    <input type="checkbox" checked={groupBy.includes(f)} onChange={() => toggleKey(f)} />
-                    <span className="truncate">{f}</span>
+                    <input
+                      type="checkbox"
+                      checked={groupKeys.includes(field)}
+                      onChange={() => toggleGroupKey(field)}
+                    />
+                    <span className="truncate">{field}</span>
                   </label>
                 ))}
               </div>
             </div>
-            {groupBy.length > 0 && (
+
+            {groupKeys.length > 0 && (
               <>
                 <Separator />
                 <div className="p-2 text-xs">
                   <div className="mb-1 text-muted-foreground">Selected</div>
                   <div className="flex flex-wrap gap-1">
-                    {groupBy.map((f) => (
+                    {groupKeys.map((field) => (
                       <button
-                        key={`sel-gb-${f}`}
+                        key={`sel-gb-${field}`}
                         className="rounded-full border px-2 py-0.5 hover:bg-muted"
-                        onClick={() => toggleKey(f)}
+                        onClick={() => toggleGroupKey(field)}
                         title="Remove"
                       >
-                        {f} ×
+                        {field} ×
                       </button>
                     ))}
+                    <button
+                      className="ml-auto rounded border px-2 py-0.5 hover:bg-muted"
+                      onClick={clearAllKeys}
+                      title="Clear all"
+                    >
+                      Clear all
+                    </button>
                   </div>
                 </div>
               </>
@@ -205,14 +178,14 @@ export default function GroupingView({
           </CardContent>
         </Card>
 
-        {/* ROLES (center) */}
+        {/* ROLES (center) — read-only */}
         <Card className="col-span-12 lg:col-span-4 flex flex-col min-h-0 overflow-hidden">
           <CardContent className="p-0 flex-1 flex flex-col min-h-0">
             <div className="p-2 flex items-center justify-between gap-2">
-              <Label className="text-sm">Field roles</Label>
+              <Label className="text-sm">Field roles (auto-inferred)</Label>
               <Input
-                value={qRoles}
-                onChange={(e) => setQRol(e.target.value)}
+                value={searchRoles}
+                onChange={(e) => setSearchRoles(e.target.value)}
                 placeholder="Search"
                 className="h-8 w-48"
               />
@@ -222,42 +195,33 @@ export default function GroupingView({
               <div className="grid grid-cols-12 gap-2">
                 <div className="col-span-6 font-medium text-muted-foreground">Field</div>
                 <div className="col-span-6 font-medium text-muted-foreground">Role</div>
-                {nonKeyFields.map((f) => {
-                  const isParent = parentFields.includes(f);
+
+                {visibleRoleFields.map((field) => {
+                  const isParent = derivedRoles.parentFields.includes(field);
+                  const isChild = derivedRoles.childFields.includes(field);
+                  const roleLabel = isParent ? "Parent" : isChild ? "Child" : "—";
+
                   return (
-                    <div key={`role-${f}`} className="contents">
-                      <div className="col-span-6 truncate border-t py-1" title={f}>
-                        {f}
+                    <div key={`role-${field}`} className="contents">
+                      <div className="col-span-6 truncate border-t py-1" title={field}>
+                        {field}
                       </div>
                       <div className="col-span-6 border-t py-1">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            className={`rounded px-2 py-0.5 border ${isParent ? "bg-muted" : ""}`}
-                            onClick={() => setRole(f, "parent")}
-                          >
-                            Parent
-                          </button>
-                          <button
-                            className={`rounded px-2 py-0.5 border ${!isParent ? "bg-muted" : ""}`}
-                            onClick={() => setRole(f, "child")}
-                          >
-                            Child
-                          </button>
-                        </div>
+                        <span className="inline-flex items-center rounded border px-2 py-0.5">
+                          {roleLabel}
+                        </span>
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+
             <Separator />
             <div className="p-2 text-xs flex flex-wrap gap-2">
-              <span className="rounded-full border px-2 py-0.5">Keys: {groupBy.length}</span>
-              <span className="rounded-full border px-2 py-0.5">Parent: {parentFields.length}</span>
-              <span className="rounded-full border px-2 py-0.5">Child: {childFields.length}</span>
-              <button className="ml-auto rounded border px-2 py-0.5 hover:bg-muted" onClick={clearAll}>
-                Clear all
-              </button>
+              <span className="rounded-full border px-2 py-0.5">Keys: {groupKeys.length}</span>
+              <span className="rounded-full border px-2 py-0.5">Parent: {derivedRoles.parentFields.length}</span>
+              <span className="rounded-full border px-2 py-0.5">Child: {derivedRoles.childFields.length}</span>
             </div>
           </CardContent>
         </Card>
@@ -267,13 +231,26 @@ export default function GroupingView({
           <Card className="flex-1 min-h-0 overflow-hidden">
             <CardContent className="p-2 flex flex-col min-h-0">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-medium">Parents (first 5)</div>
-                <div className="text-xs text-muted-foreground">
-                  {enabled ? `total: ${preview.stats.parents}` : "—"}
+                <div className="text-xs font-medium">Parents ({showAllParents ? "all" : "first 5"})</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {groupKeys.length ? `total: ${previewData.stats.parents}` : "—"}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={!groupKeys.length}
+                    onClick={() => setShowAllParents((v) => !v)}
+                  >
+                    {showAllParents ? "Show 5" : "Show all"}
+                  </Button>
                 </div>
               </div>
               <pre className="text-xs overflow-auto mt-1 flex-1 min-h-0">
-{enabled && groupBy.length ? JSON.stringify(preview.parents.slice(0, 5), null, 2) : "Enable + pick keys to preview"}
+                {groupKeys.length
+                  ? JSON.stringify(parentsPreview, null, 2)
+                  : "Pick one or more keys to preview"}
               </pre>
             </CardContent>
           </Card>
@@ -281,13 +258,26 @@ export default function GroupingView({
           <Card className="flex-1 min-h-0 overflow-hidden">
             <CardContent className="p-2 flex flex-col min-h-0">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-medium">Children (first 5)</div>
-                <div className="text-xs text-muted-foreground">
-                  {enabled ? `total: ${preview.stats.children}` : "—"}
+                <div className="text-xs font-medium">Children ({showAllChildren ? "all" : "first 5"})</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {groupKeys.length ? `total: ${previewData.stats.children}` : "—"}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    disabled={!groupKeys.length}
+                    onClick={() => setShowAllChildren((v) => !v)}
+                  >
+                    {showAllChildren ? "Show 5" : "Show all"}
+                  </Button>
                 </div>
               </div>
               <pre className="text-xs overflow-auto mt-1 flex-1 min-h-0">
-{enabled && groupBy.length ? JSON.stringify(preview.children.slice(0, 5), null, 2) : "Enable + pick keys to preview"}
+                {groupKeys.length
+                  ? JSON.stringify(childrenPreview, null, 2)
+                  : "Pick one or more keys to preview"}
               </pre>
             </CardContent>
           </Card>

@@ -1,35 +1,33 @@
 import { Button } from "@/components/ui/button";
+import { useImportController } from "./ImportControllerContext";
 
-export type ImportFunctionsProps = {
-  normalizeDates: boolean;
-  setNormalizeDates: (v: boolean) => void;
-  normalizeCurrency: boolean;
-  setNormalizeCurrency: (v: boolean) => void;
-  removeEmptyRows: boolean;
-  setRemoveEmptyRows: (v: boolean) => void;
-  removeMostlyEmptyRows: boolean;
-  setRemoveMostlyEmptyRows: (v: boolean) => void;
-  mostlyThreshold: number;
-  setMostlyThreshold: (v: number) => void;
+export default function ImportFunctions() {
+  const controller = useImportController();
 
-  // widen these two to avoid arg-shape mismatch
-  recompute: (baseRows?: any[] | any[][], opts?: { keepMapping?: boolean }) => void;
-  rawRows: any[] | any[][];
-  headers: string[];
-  loading: boolean;
-  sheetName: string;
-};
+  // Source info used to enable/disable UI
+  const { sheetName } = controller.source;
 
+  // Pipeline bits
+  const { headers, rawRows } = controller.pipeline.data;
+  const { loading } = controller.pipeline;
 
-export default function ImportFunctions(props: ImportFunctionsProps) {
   const {
-    normalizeDates, setNormalizeDates,
-    normalizeCurrency, setNormalizeCurrency,
-    removeEmptyRows, setRemoveEmptyRows,
-    removeMostlyEmptyRows, setRemoveMostlyEmptyRows,
-    mostlyThreshold, setMostlyThreshold,
-    recompute, rawRows, headers, loading, sheetName,
-  } = props;
+    normalizeDates,
+    normalizeCurrency,
+    removeEmptyRows,
+    removeMostlyEmptyRows,
+    mostlyThreshold,
+  } = controller.pipeline.rules;
+
+  const {
+    setNormalizeDates,
+    setNormalizeCurrency,
+    setRemoveEmptyRows,
+    setRemoveMostlyEmptyRows,
+    setMostlyThreshold,
+  } = controller.pipeline.setRules;
+
+  const { recompute } = controller.pipeline.actions;
 
   const disabled = !sheetName || !!loading || !headers.length;
 
@@ -42,6 +40,7 @@ export default function ImportFunctions(props: ImportFunctionsProps) {
           checked={normalizeDates}
           onChange={(e) => {
             setNormalizeDates(e.target.checked);
+            // optional: recompute kept for UX; derived pipeline updates automatically
             recompute(rawRows, { keepMapping: true });
           }}
         />
@@ -65,7 +64,10 @@ export default function ImportFunctions(props: ImportFunctionsProps) {
       <div className="w-px h-5 bg-border mx-1" />
 
       {/* Remove empty rows */}
-      <label className="flex items-center gap-1 text-sm cursor-pointer" title="Remove rows where all cells are blank">
+      <label
+        className="flex items-center gap-1 text-sm cursor-pointer"
+        title="Remove rows where all cells are blank"
+      >
         <input
           type="checkbox"
           checked={removeEmptyRows}
@@ -78,7 +80,10 @@ export default function ImportFunctions(props: ImportFunctionsProps) {
       </label>
 
       {/* Remove mostly-empty rows */}
-      <label className="flex items-center gap-1 text-sm cursor-pointer" title="Remove rows where ≥80% cells are blank">
+      <label
+        className="flex items-center gap-1 text-sm cursor-pointer"
+        title="Remove rows where ≥80% cells are blank"
+      >
         <input
           type="checkbox"
           checked={removeMostlyEmptyRows}
