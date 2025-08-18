@@ -56,7 +56,7 @@ export default function DatasetDetail() {
     <div className="space-y-4">
       {/* Title + quick nav */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{dataset?.name ?? "Dataset"}</h1>
+        <h1 className="text-xl font-semibold">{dataset?.name ?? "Dataset"}</h1>
         <div className="flex gap-2">
 
           {/* Delete dataset */}

@@ -1,4 +1,3 @@
-// src/pages/apps/SheetsManager/MappingEditor.tsx
 import { useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,23 +30,24 @@ export default function MappingEditor({
   const warningCount = useMemo(() => issues.filter((i) => i.level === "warning").length, [issues]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Mapping</CardTitle>
-        <CardDescription>
+    <Card className="h-[68vh] flex flex-col">
+      <CardHeader className="py-3">
+        <CardTitle className="text-base">Mapping</CardTitle>
+        <CardDescription className="text-xs">
           Rename columns and set types. Use “Check Data” to re-validate.
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Actions */}
+      {/* Body fills the card; internal scroll only for the long list */}
+      <CardContent className="flex-1 min-h-0 flex flex-col gap-3 pt-0">
+        {/* Actions (non-scrolling) */}
         <div className="flex flex-wrap gap-2">
           <Button className="cursor-pointer" onClick={onCheckData}>
             Check Data (re-validate)
           </Button>
         </div>
 
-        {/* Error / warning banner */}
+        {/* Error / warning banner (non-scrolling) */}
         {(errorCount > 0 || warningCount > 0) && (
           <div
             className={`rounded-md border p-3 text-sm ${
@@ -62,62 +62,62 @@ export default function MappingEditor({
           </div>
         )}
 
-        {/* Dataset/Table label (UX label only) */}
+        {/* Dataset label (non-scrolling) */}
         <div className="flex items-center gap-2">
           <span className="text-sm">Dataset label:</span>
           <Input
-            className="w-[360px]"
+            className="w-[300px]"
             value={datasetName}
             onChange={(e) => setDatasetName(e.target.value)}
             placeholder="e.g., supplier_orders"
           />
         </div>
 
-        {/* Column mapping */}
-        {mapping.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {mapping.map((m, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <Input
-                  className="w-48"
-                  value={m.name}
-                  onChange={(e) =>
-                    setMapping(
-                      mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x))
-                    )
-                  }
-                />
-                <Select
-                  value={m.type}
-                  onValueChange={(v) =>
-                    setMapping(
-                      mapping.map((x, i) =>
-                        i === idx ? { ...x, type: v as SimpleType } : x
+        {/* Mapping list (scrolls) */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {mapping.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {mapping.map((m, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    className="w-44"
+                    value={m.name}
+                    onChange={(e) =>
+                      setMapping(
+                        mapping.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x))
                       )
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="string">string</SelectItem>
-                    <SelectItem value="number">number</SelectItem>
-                    <SelectItem value="boolean">boolean</SelectItem>
-                    <SelectItem value="date">date</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-muted-foreground">
-                  mapped from: <code>{m.map_from}</code>
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Load a preview to configure mapping.
-          </p>
-        )}
+                    }
+                  />
+                  <Select
+                    value={m.type}
+                    onValueChange={(v) =>
+                      setMapping(
+                        mapping.map((x, i) =>
+                          i === idx ? { ...x, type: v as SimpleType } : x
+                        )
+                      )
+                    }
+                  >
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="string">string</SelectItem>
+                      <SelectItem value="number">number</SelectItem>
+                      <SelectItem value="boolean">boolean</SelectItem>
+                      <SelectItem value="date">date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground truncate">
+                    mapped from: <code>{m.map_from}</code>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Load a preview to configure mapping.</p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
