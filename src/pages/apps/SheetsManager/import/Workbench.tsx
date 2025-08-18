@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from "react";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import ImportFunctions from "../components/ImportFunctions";
 import GroupingView from "./GroupingView";
@@ -61,7 +60,7 @@ export default function Workbench() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Sheets Manager</h1>
+          <h1 className="text-base font-semibold">Actions</h1>
           <p className="text-sm text-muted-foreground">
             {subtitle}
             {groupingEnabled && groupingConfig?.groupBy?.length ? (
@@ -101,8 +100,6 @@ export default function Workbench() {
           </Button>
         </div>
       </div>
-
-      <Separator />
 
       {/* 2-column layout */}
       <div className="grid grid-cols-12 gap-4">

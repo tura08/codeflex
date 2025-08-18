@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+// src/pages/apps/SheetsManager/layout/SheetsShell.tsx
+import React, { createContext, useContext, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ImportControllerProvider } from "../import/ImportController";
 
@@ -21,16 +22,12 @@ export default function SheetsShell() {
   const isView = location.pathname.startsWith(`${base}/view`);
   const active = isView ? "view" : "import";
 
-  useEffect(() => {
-    setActions(null);
-  }, [location.pathname]);
-
   const ShellBody = (
     <div className="space-y-4">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b bg-card px-4 py-3 rounded-md">
+      {/* Top bar (no bottom border here) */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Sheets Manager</h1>
+          <h1 className="text-2xl font-semibold">Sheets Manager</h1>
           <p className="text-sm text-muted-foreground">
             Import data from Sheets → map → validate → store → browse.
           </p>
@@ -38,7 +35,7 @@ export default function SheetsShell() {
         <div className="flex items-center gap-2">{actions}</div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs (single separator row) */}
       <div className="flex gap-2 border-b px-2">
         <button
           onClick={() => navigate(base)}
@@ -64,14 +61,14 @@ export default function SheetsShell() {
         </button>
       </div>
 
+      {/* Page content */}
       <Outlet />
     </div>
   );
 
   return (
     <TopBarCtx.Provider value={value}>
-      {/* Always wrap so header-mounted components (e.g., Import toolbar, ConnectDialog)
-          never render without the provider during route transitions. */}
+      {/* Provider wraps the entire shell so header-mounted components are always safe */}
       <ImportControllerProvider>{ShellBody}</ImportControllerProvider>
     </TopBarCtx.Provider>
   );
