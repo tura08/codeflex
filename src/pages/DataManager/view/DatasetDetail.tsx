@@ -121,7 +121,7 @@ export default function DatasetDetail() {
                         toast.success("Dataset deleted");
                         setOpenDelete(false);
                         // Redirect back to list
-                        window.location.assign("/apps/sheetsmanager/datasets");
+                        window.location.assign("/datamanager/view/datasets");
                       } catch (e: any) {
                         toast.error("Delete failed", {
                           description: e?.message ?? "Unknown error",

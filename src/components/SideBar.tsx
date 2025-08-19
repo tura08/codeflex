@@ -35,7 +35,7 @@ export function SideBar() {
   return (
     <Sidebar side="left" variant="sidebar" className="bg-sidebar text-sidebar-foreground">
       <SidebarHeader className="py-4 text-center">
-        <span className="text-2xl font-bold">CodeFlex</span>
+        <span className="text-2xl font-bold">CodeFlex|Kubrik</span>
       </SidebarHeader>
 
       <SidebarContent>
