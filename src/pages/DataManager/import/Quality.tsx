@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/Quality.tsx
+// src/pages/DataManager/import/Quality.tsx
 import type { Issue } from "@/lib/google/sheets-import";
 
 export function QualityBar(props: { rows: number; columns: number; cells: number; errors: number; warnings: number }) {

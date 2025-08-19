@@ -1,4 +1,4 @@
-// src/integrations/google/components/SheetsWidgets.tsx
+// src/pages/DataManager/import/SheetsWidgets.tsx
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 

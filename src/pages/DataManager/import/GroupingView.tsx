@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/import/GroupingView.tsx
+// src/pages/DataManager/import/GroupingView.tsx
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

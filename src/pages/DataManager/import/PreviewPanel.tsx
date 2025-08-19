@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/components/PreviewPane.tsx
+// src/pages/DataManager/import/PreviewPanel.tsx
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PreviewTable } from "@/pages/DataManager/import/SheetsWidgets";
 import { IssuesPanel, QualityBar } from "./Quality";

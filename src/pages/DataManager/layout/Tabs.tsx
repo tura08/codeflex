@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/components/Tabs.tsx
+// src/pages/DataManager/layout/Tabs.tsx
 
 type Item = { key: string; label: string };
 export function Tabs({
