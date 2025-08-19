@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Eye, EyeOff, Save } from "lucide-react"
-import { GoogleDriveCard } from "@/pages/apps/SheetsManager/import/SheetsWidgets"
+import { GoogleDriveCard } from "@/pages/DataManager/import/SheetsWidgets"
 
 export default function SettingsPage() {
   const [dbUrl, setDbUrl] = useState("")

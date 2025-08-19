@@ -1,6 +1,6 @@
 // src/pages/apps/SheetsManager/components/PreviewPane.tsx
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { PreviewTable } from "@/pages/apps/SheetsManager/import/SheetsWidgets";
+import { PreviewTable } from "@/pages/DataManager/import/SheetsWidgets";
 import { IssuesPanel, QualityBar } from "./Quality";
 
 type Stats = { rows: number; columns: number; cells: number; errors: number; warnings: number };

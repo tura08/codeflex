@@ -1,33 +1,34 @@
-// src/pages/apps/SheetsManager/layout/SheetsShell.tsx
+// src/pages/datamanager/layout/DataShell.tsx
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ImportControllerProvider } from "../import/ImportControllerContext";
+import { ImportControllerProvider } from "@/pages/DataManager/import/ImportControllerContext"; // keep provider; path can stay if file lives there
 
 type TopBarActionsCtx = { setTopBarActions: (node: React.ReactNode | null) => void };
 const TopBarCtx = createContext<TopBarActionsCtx | null>(null);
 
 export function useTopBarActions() {
   const ctx = useContext(TopBarCtx);
-  if (!ctx) throw new Error("useTopBarActions must be used within SheetsShell");
+  if (!ctx) throw new Error("useTopBarActions must be used within DataShell");
   return ctx.setTopBarActions;
 }
 
-export default function SheetsShell() {
+export default function DataShell() {
   const [actions, setActions] = useState<React.ReactNode | null>(null);
   const value = useMemo(() => ({ setTopBarActions: setActions }), []);
   const location = useLocation();
   const navigate = useNavigate();
 
-  const base = "/apps/sheetsmanager";
+  // NEW base route
+  const base = "/datamanager";
   const isView = location.pathname.startsWith(`${base}/view`);
   const active = isView ? "view" : "import";
 
   const ShellBody = (
     <div className="space-y-4">
-      {/* Top bar (no bottom border here) */}
+      {/* Top bar */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Sheets Manager</h1>
+          <h1 className="text-2xl font-semibold">Data Manager</h1>
           <p className="text-sm text-muted-foreground">
             Import data from Sheets → map → validate → store → browse.
           </p>
@@ -35,7 +36,7 @@ export default function SheetsShell() {
         <div className="flex items-center gap-2">{actions}</div>
       </div>
 
-      {/* Tabs (single separator row) */}
+      {/* Tabs */}
       <div className="flex gap-2 border-b px-2">
         <button
           onClick={() => navigate(base)}

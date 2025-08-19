@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GoogleConnect, SpreadsheetSelect, SheetTabSelect } from "@/pages/apps/SheetsManager/import/SheetsWidgets";
+import { GoogleConnect, SpreadsheetSelect, SheetTabSelect } from "@/pages/DataManager/import/SheetsWidgets";
 
 export function SourceControls(props: {
   spreadsheetId: string; setSpreadsheetId: (v: string) => void;

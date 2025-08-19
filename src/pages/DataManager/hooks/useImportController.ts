@@ -7,7 +7,7 @@ import { appendImportSingleTable } from "@/lib/google/append-import";
 import { getOrCreateSheetSource } from "@/lib/google/sheets-sources";
 import { applyRules, validate, qualityFromIssues, type TransformRule } from "@/lib/google/sheets-import";
 import { inferType, normalizeHeader, coerce } from "@/lib/google/infer";
-import type { Mapping } from "../../../../integrations/google/types";
+import type { Mapping } from "../../../integrations/google/types";
 
 /** Public shape consumed by the Provider/context. */
 export type ImportControllerValue = {

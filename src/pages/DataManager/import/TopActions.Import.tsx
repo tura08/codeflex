@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { useTopBarActions } from "../layout/SheetsShell";
+import { useTopBarActions } from "../layout/DataShell";
 import ConnectDialog from "./ConnectDialog";
 import { useImportController } from "./ImportControllerContext";
 

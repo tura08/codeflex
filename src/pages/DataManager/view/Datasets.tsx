@@ -1,5 +1,5 @@
 // src/pages/apps/SheetsManager/datasets/Datasets.tsx
-import { useDatasetsList } from "@/pages/apps/SheetsManager/hooks/useDatasetBrowser";
+import { useDatasetsList } from "@/pages/DataManager/hooks/useDatasetBrowser";
 import DatasetList from "./DatasetList";
 
 export default function Datasets() {

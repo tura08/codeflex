@@ -43,7 +43,7 @@ export function GoogleDriveCard() {
       <CardHeader>
         <CardTitle>Google Drive & Sheets</CardTitle>
         <CardDescription>Connect your Google account to enable Sheets integration.</CardDescription>
-        <Link to="/apps/sheetsmanager" className="text-primary underline text-sm">
+        <Link to="/datamanager" className="text-primary underline text-sm">
           Go to Sheets Manager
         </Link>
       </CardHeader>

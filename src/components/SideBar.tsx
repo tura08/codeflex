@@ -21,11 +21,12 @@ import {
 } from "lucide-react"
 
 const items = [
-  { title: "Dashboard",      url: "/",                   icon: LayoutDashboard },
-  { title: "Analyse",        url: "/analyse",            icon: SlidersHorizontal },
-  { title: "Apps",           url: "/apps",               icon: AppWindowMac },
-  { title: "Sheets Manager", url: "/apps/sheetsmanager", icon: Table },
-  { title: "Settings",       url: "/settings",           icon: SettingsIcon },
+  { title: "Dashboard",    url: "/",             icon: LayoutDashboard },
+  { title: "Analyse",      url: "/analyse",      icon: SlidersHorizontal },
+  // NEW: Data Manager as a top-level entry (not under /apps)
+  { title: "Data Manager", url: "/datamanager",  icon: Table },
+  { title: "Apps",         url: "/apps",         icon: AppWindowMac },
+  { title: "Settings",     url: "/settings",     icon: SettingsIcon },
 ]
 
 export function SideBar() {
@@ -43,7 +44,7 @@ export function SideBar() {
           <SidebarGroupLabel>Main</SidebarGroupLabel>
           <SidebarMenu>
             {items.map(({ title, url, icon: Icon }) => {
-              const isActive = pathname === url
+              const isActive = pathname === url || pathname.startsWith(url + "/")
               return (
                 <SidebarMenuItem key={title}>
                   <SidebarMenuButton asChild tooltip={title}>

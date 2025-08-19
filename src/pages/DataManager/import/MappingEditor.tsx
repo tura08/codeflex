@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { type SimpleType } from "@/lib/google/infer";
-import type { Mapping } from "../hooks/useImportController";
 import type { Issue } from "@/lib/google/sheets-import";
+import type { Mapping } from "@/integrations/google/types";
 
 type Props = {
   mapping: Mapping[];

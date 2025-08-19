@@ -14,11 +14,11 @@ import NewApp from "@/pages/apps/NewApp";
 import Dashboard from "@/pages/Dashboard";
 import LoginPage from "@/pages/Login";
 import SignupPage from "@/pages/Signup";
-import Datasets from "@/pages/apps/SheetsManager/view/Datasets";
-import ImportPage from "./pages/apps/SheetsManager/import/ImportPage";
-import SheetsShell from "./pages/apps/SheetsManager/layout/SheetsShell";
-import ViewPage from "./pages/apps/SheetsManager/view/ViewPage";
-import DatasetDetail from "./pages/apps/SheetsManager/view/DatasetDetail";
+import Datasets from "@/pages/DataManager/view/Datasets";
+import ImportPage from "./pages/DataManager/import/ImportPage";
+import SheetsShell from "./pages/DataManager/layout/DataShell";
+import ViewPage from "./pages/DataManager/view/ViewPage";
+import DatasetDetail from "./pages/DataManager/view/DatasetDetail";
 
 export default function App() {
   return (
@@ -46,7 +46,7 @@ export default function App() {
                       <Route path="/apps/:id" element={<AppDetails />} />
 
                       {/* SheetsManager app routes */}
-                      <Route path="/apps/sheetsmanager/*" element={<SheetsShell />}>
+                      <Route path="/datamanager/*" element={<SheetsShell />}>
                         <Route index element={<ImportPage />} />
                         <Route path="view" element={<ViewPage />} />
                         <Route path="view/datasets" element={<Datasets />} />
