@@ -1,5 +1,4 @@
-// src/pages/DataManager/import/ConnectDialog.tsx
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SourceControls } from "./SourceControls";
@@ -9,11 +8,14 @@ import { saveSheetSource } from "@/lib/google/sheets-sources";
 import { useGoogleAuth } from "@/integrations/google/hooks/useGoogleAuth";
 import { useImportController } from "./ImportControllerContext";
 
-export default function ConnectDialog() {
+export default function ConnectDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const controller = useImportController();
-
-  // dialog
-  const { open, openConnect, closeConnect } = controller.dialog;
 
   // source fields
   const {
@@ -25,8 +27,8 @@ export default function ConnectDialog() {
     loadPreview,
   } = controller.source;
 
-  // pipeline loading state
-  const { loading } = controller.pipeline;
+  // local loading
+  const [loading, setLoading] = useState(false);
 
   const { connected } = useGoogleAuth();
 
@@ -38,12 +40,16 @@ export default function ConnectDialog() {
         toast.error("Please connect Google first.");
         return;
       }
+      setLoading(true);
       await loadPreview(); // uses current source state
       if (!datasetName) setDatasetName(sheetName);
+      onOpenChange(false); // close dialog on success
     } catch (e: any) {
       toast.error("Failed to load preview", { description: e?.message ?? "Unknown error" });
+    } finally {
+      setLoading(false);
     }
-  }, [connected, loadPreview, datasetName, setDatasetName, sheetName]);
+  }, [connected, loadPreview, datasetName, setDatasetName, sheetName, onOpenChange]);
 
   const handleSaveSource = useCallback(async () => {
     if (!connected) {
@@ -74,16 +80,8 @@ export default function ConnectDialog() {
     }
   }, [connected, spreadsheetId, sheetName, headerRow]);
 
-  const handleDialogOpenChange = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen) openConnect();
-      else closeConnect();
-    },
-    [openConnect, closeConnect]
-  );
-
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Connect Google Sheet</DialogTitle>

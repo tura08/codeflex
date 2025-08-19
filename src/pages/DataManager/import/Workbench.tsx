@@ -1,27 +1,14 @@
-// src/pages/DatasManager/import/Workbench.tsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import ImportFunctions from "./ImportFunctions";
 import GroupingView from "./GroupingView";
 import MappingEditor from "./MappingEditor";
-import { toast } from "sonner";
 import PreviewPanel from "./PreviewPanel";
 import { useImportController } from "./ImportControllerContext";
 
 export default function Workbench() {
   const controller = useImportController();
-
-  // Pipeline
-  const { headers, rows, rawRows, mapping, issues, stats } = controller.pipeline.data;
-  const { setMapping } = controller.pipeline.setRules;
-  const { recompute } = controller.pipeline.actions;
-  const { skipped } = controller.pipeline;
-
-  // Source / dataset
+  const { headers, rows, mapping, setMapping } = controller.pipeline;
   const { sheetName, datasetName, setDatasetName } = controller.source;
-  const { records } = controller.dataset;
-
-  // Grouping (display only here)
   const { enabled: groupingEnabled, config: groupingConfig } = controller.grouping;
 
   // Local UI state
@@ -32,23 +19,8 @@ export default function Workbench() {
     [sheetName]
   );
 
-  useEffect(() => {
-    if (skipped.empty || skipped.mostly) {
-      const parts: string[] = [];
-      if (skipped.empty) parts.push(`${skipped.empty} empty`);
-      if (skipped.mostly) parts.push(`${skipped.mostly} mostly-empty`);
-      toast("Rows skipped", { description: parts.join(" · ") });
-    }
-  }, [skipped.empty, skipped.mostly]);
-
   if (view === "grouping") {
-    return (
-      <GroupingView
-        onClose={() => {
-          setView("workbench");
-        }}
-      />
-    );
+    return <GroupingView onClose={() => setView("workbench")} />;
   }
 
   return (
@@ -67,13 +39,12 @@ export default function Workbench() {
           </p>
         </div>
 
-        {/* Right: rules + Grouping */}
+        {/* Right: Grouping */}
         <div className="flex items-center gap-4">
-          <ImportFunctions />
           <Button
             variant="outline"
             className="cursor-pointer"
-            disabled={!records.length}
+            disabled={!rows.length}
             onClick={() => setView("grouping")}
           >
             Grouping
@@ -84,16 +55,16 @@ export default function Workbench() {
       {/* 2-column layout */}
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 xl:col-span-8 space-y-4">
-          <PreviewPanel headers={headers} rows={rows} stats={stats} issues={issues} />
+          <PreviewPanel headers={headers} rows={rows} mapping={mapping} />
         </div>
         <div className="col-span-12 xl:col-span-4 space-y-4">
           <MappingEditor
+            headers={headers}
+            rows={rows}
             mapping={mapping}
             setMapping={setMapping}
             datasetName={datasetName}
             setDatasetName={setDatasetName}
-            issues={issues}
-            onCheckData={() => recompute(rawRows, { keepMapping: true })}
           />
         </div>
       </div>

@@ -14,8 +14,10 @@ export default function GroupingView({ onClose }: Props) {
   const controller = useImportController();
 
   // Data
-  const { records, availableFields: allFields } = controller.dataset;
+  const { mapping } = controller.pipeline;
+  const { records } = controller.dataset;
   const { config: savedConfig } = controller.grouping;
+  const allFields = useMemo(() => mapping.map((m) => m.name), [mapping]);
 
   // Initial keys (saved or first field)
   const initialKeys: string[] =

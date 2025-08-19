@@ -1,21 +1,32 @@
-// src/pages/DataManager/import/PreviewPanel.tsx
+import { useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PreviewTable } from "@/pages/DataManager/import/SheetsWidgets";
 import { IssuesPanel, QualityBar } from "./Quality";
+import { validate, qualityFromIssues } from "@/lib/google/sheets-import";
+import type { Mapping } from "@/integrations/google/types";
 
-type Stats = { rows: number; columns: number; cells: number; errors: number; warnings: number };
-
-export default function PreviewPane({
+export default function PreviewPanel({
   headers,
   rows,
-  stats,
-  issues,
+  mapping,
 }: {
   headers: string[];
   rows: any[][];
-  stats: Stats;
-  issues: any[];
+  mapping: Mapping[];
 }) {
+  // derive column types from mapping
+  const types = useMemo(() => mapping.map((c) => c.type), [mapping]);
+
+  const issues = useMemo(() => {
+    if (!headers.length || !rows.length) return [];
+    return validate(rows, headers, types);
+  }, [rows, headers, types]);
+
+  const stats = useMemo(
+    () => qualityFromIssues(rows.length, headers.length, issues),
+    [rows.length, headers.length, issues]
+  );
+
   return (
     <Card className="h-[68vh] flex flex-col">
       <CardHeader>

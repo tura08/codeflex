@@ -1,29 +1,35 @@
 import { useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { validate } from "@/lib/google/sheets-import";
 import { type SimpleType } from "@/lib/google/infer";
-import type { Issue } from "@/lib/google/sheets-import";
 import type { Mapping } from "@/integrations/google/types";
 
 type Props = {
+  headers: string[];
+  rows: any[][];
   mapping: Mapping[];
   setMapping: (m: Mapping[]) => void;
   datasetName: string;
   setDatasetName: (v: string) => void;
-  issues: Issue[];
-  onCheckData: () => void;
 };
 
 export default function MappingEditor({
+  headers,
+  rows,
   mapping,
   setMapping,
   datasetName,
   setDatasetName,
-  issues,
-  onCheckData,
 }: Props) {
+  // compute issues locally so banner updates immediately on mapping changes
+  const issues = useMemo(() => {
+    if (!headers.length || !rows.length) return [];
+    const types = mapping.map((c) => c.type);
+    return validate(rows, headers, types);
+  }, [rows, headers, mapping]);
+
   const errorCount = useMemo(() => issues.filter((i) => i.level === "error").length, [issues]);
   const warningCount = useMemo(() => issues.filter((i) => i.level === "warning").length, [issues]);
 
@@ -32,19 +38,11 @@ export default function MappingEditor({
       <CardHeader className="py-3">
         <CardTitle className="text-base">Mapping</CardTitle>
         <CardDescription className="text-xs">
-          Rename columns and set types. Use “Check Data” to re-validate.
+          Rename columns and set types. Validation updates automatically.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex-1 min-h-0 flex flex-col gap-3 pt-0">
-        {/* Actions (non-scrolling) */}
-        <div className="flex flex-wrap gap-2">
-          <Button className="cursor-pointer" onClick={onCheckData}>
-            Check Data (re-validate)
-          </Button>
-        </div>
-
-        {/* Error / warning banner (non-scrolling) */}
         {(errorCount > 0 || warningCount > 0) && (
           <div
             className={`rounded-md border p-3 text-sm ${
@@ -59,7 +57,7 @@ export default function MappingEditor({
           </div>
         )}
 
-        {/* Dataset label (non-scrolling) */}
+        {/* Dataset label */}
         <div className="flex items-center gap-2">
           <span className="text-sm">Dataset label:</span>
           <Input
@@ -70,7 +68,7 @@ export default function MappingEditor({
           />
         </div>
 
-        {/* Mapping list (scrolls) */}
+        {/* Mapping list */}
         <div className="flex-1 min-h-0 overflow-auto">
           {mapping.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
