@@ -1,4 +1,3 @@
-// src/pages/DataManager/import/SheetsWidgets.tsx
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -7,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useGoogleAuth } from "@/integrations/google/hooks/useGoogleAuth";
-import { useSheets } from "@/integrations/google/hooks/useSheets";
+import { googleListSpreadsheets, googleGetSheetTabs } from "@/lib/google-sheets/api";
 
 /* ──────────────────────────────────────────────────────────────
    GoogleConnect
@@ -86,7 +85,7 @@ export function PreviewTable({ headers, rows }: { headers: string[]; rows: any[]
 }
 
 /* ──────────────────────────────────────────────────────────────
-   SpreadsheetSelect  (stable: fetch once, local busy)
+   SpreadsheetSelect
 ─────────────────────────────────────────────────────────────── */
 export function SpreadsheetSelect({
   value,
@@ -95,7 +94,6 @@ export function SpreadsheetSelect({
   value?: string;
   onChange: (id: string) => void;
 }) {
-  const { fetchSpreadsheets } = useSheets(); // don't depend on hook.loading
   const [files, setFiles] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +102,8 @@ export function SpreadsheetSelect({
     try {
       setBusy(true);
       setError(null);
-      const list = await fetchSpreadsheets();
-      setFiles(list);
+      const list = await googleListSpreadsheets();
+      setFiles(list.map((f) => ({ id: f.id, name: f.name })));
     } catch (e: any) {
       setError(e?.message ?? "Failed to load spreadsheets");
     } finally {
@@ -115,7 +113,6 @@ export function SpreadsheetSelect({
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -144,7 +141,7 @@ export function SpreadsheetSelect({
 }
 
 /* ──────────────────────────────────────────────────────────────
-   SheetTabSelect  (stable: refetch only when spreadsheetId changes)
+   SheetTabSelect
 ─────────────────────────────────────────────────────────────── */
 export function SheetTabSelect({
   spreadsheetId,
@@ -155,7 +152,6 @@ export function SheetTabSelect({
   value?: string;
   onChange: (name: string) => void;
 }) {
-  const { fetchTabs } = useSheets();
   const [tabs, setTabs] = useState<{ id: number; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +162,7 @@ export function SheetTabSelect({
       try {
         setBusy(true);
         setError(null);
-        const list = await fetchTabs(spreadsheetId);
+        const list = await googleGetSheetTabs(spreadsheetId);
         setTabs(list);
       } catch (e: any) {
         setError(e?.message ?? "Failed to load tabs");
@@ -174,8 +170,7 @@ export function SheetTabSelect({
         setBusy(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spreadsheetId]); // only when spreadsheet changes
+  }, [spreadsheetId]);
 
   if (!spreadsheetId) return null;
 

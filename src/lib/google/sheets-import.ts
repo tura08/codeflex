@@ -1,5 +1,4 @@
 // src/lib/google/sheets-import.ts
-import { supabase } from "../supabase-client";
 import type { SimpleType } from "./infer";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -39,36 +38,6 @@ function isBlank(v: unknown) {
   return v === null || v === undefined || (typeof v === "string" && v.trim() === "");
 }
 
-function parseCurrencyLoose(input: unknown): number | null {
-  if (input === null || input === undefined) return null;
-  if (typeof input === "number") return Number.isFinite(input) ? input : null;
-  const s0 = String(input).trim();
-  if (!s0) return null;
-
-  // keep digits, separators, minus
-  const s = s0.replace(/[^\d.,-]/g, "");
-  if (!s) return null;
-
-  const lastDot = s.lastIndexOf(".");
-  const lastComma = s.lastIndexOf(",");
-
-  let normalized = s;
-
-  if (lastComma !== -1 && lastDot !== -1) {
-    if (lastComma > lastDot) {
-      normalized = s.replace(/\./g, "").replace(",", ".");
-    } else {
-      normalized = s.replace(/,/g, "");
-    }
-  } else if (lastComma !== -1) {
-    normalized = s.replace(/\./g, "").replace(",", ".");
-  } else {
-    normalized = s.replace(/,/g, "");
-  }
-
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
-}
 
 /** Parse strings like ISO, dd/mm/yyyy, mm/dd/yyyy. No numeric serial support. */
 function parseDateLoose(v: unknown, dayFirst = true): Date | null {
@@ -127,16 +96,6 @@ export function applyRules(
         }
       }
 
-      if (rule.kind === "parseCurrency") {
-        for (const c of rule.columns) {
-          const i = colIndex(c);
-          if (i >= 0) {
-            const n = parseCurrencyLoose(out[i]);
-            if (n !== null) out[i] = n;
-          }
-        }
-      }
-
       if (rule.kind === "parseDate") {
         for (const c of rule.columns) {
           const i = colIndex(c);
@@ -177,7 +136,7 @@ export function validate(
       if (isBlank(v)) return;
 
       if (t === "number") {
-        const n = typeof v === "number" ? v : parseCurrencyLoose(v);
+        const n = typeof v === "number";
         if (n === null) {
           issues.push({ level: "error", message: "Invalid number", row: r, column: headers[i], code: "NUMBER_INVALID" });
         }
@@ -220,11 +179,4 @@ export function qualityFromIssues(rows: number, columns: number, issues: Issue[]
   };
 }
 
-export async function listSheetSources(): Promise<SheetSource[]> {
-  const { data, error } = await supabase
-    .from("sheet_sources")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
+
