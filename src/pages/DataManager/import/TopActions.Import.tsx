@@ -1,20 +1,12 @@
+// src/pages/DataManager/import/TopActions.Import.tsx
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTopBarActions } from "../layout/DataShell";
 import ConnectDialog from "./ConnectDialog";
-import { useImportController } from "./ImportControllerContext";
+import { useImport } from "../context/ImportContext";
 
-/** Inline toolbar mounted once into the shell header. */
-function ToolbarInline({
-  open,
-  setOpen,
-}: {
-  open: boolean;
-  setOpen: (v: boolean) => void;
-}) {
-  const controller = useImportController();
-  const { saving, run: save } = controller.save;
-  const { rows } = controller.pipeline;
+function ToolbarInline({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+  const { state, saveImport } = useImport();
 
   return (
     <>
@@ -22,8 +14,8 @@ function ToolbarInline({
         <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
           Connect & Load
         </Button>
-        <Button size="sm" onClick={save} disabled={saving || !rows?.length}>
-          {saving ? "Saving…" : "Save"}
+        <Button size="sm" onClick={saveImport} disabled={!state.rows.length || state.saving}>
+          {state.saving ? "Saving…" : "Save"}
         </Button>
       </div>
       <ConnectDialog open={open} onOpenChange={setOpen} />

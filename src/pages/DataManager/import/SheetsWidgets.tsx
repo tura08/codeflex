@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { useGoogleAuth } from "@/integrations/google/hooks/useGoogleAuth";
-import { googleListSpreadsheets, googleGetSheetTabs } from "@/lib/google-sheets/api";
+import { useGoogleAuth } from "@/pages/DataManager/hooks/useGoogleAuth";
+import { listSpreadsheets, getSheetTabs } from "@/lib/google/api";
 
 /* ──────────────────────────────────────────────────────────────
    GoogleConnect
@@ -53,36 +53,6 @@ export function GoogleDriveCard() {
   );
 }
 
-/* ──────────────────────────────────────────────────────────────
-   PreviewTable
-─────────────────────────────────────────────────────────────── */
-export function PreviewTable({ headers, rows }: { headers: string[]; rows: any[][] }) {
-  if (!headers.length) return null;
-  return (
-    <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i} className="border-b p-2 text-left whitespace-nowrap font-medium">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="hover:bg-muted/30">
-              {headers.map((_, j) => (
-                <td key={j} className="border-b p-2 whitespace-nowrap">{String(r[j] ?? "")}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 /* ──────────────────────────────────────────────────────────────
    SpreadsheetSelect
@@ -102,7 +72,7 @@ export function SpreadsheetSelect({
     try {
       setBusy(true);
       setError(null);
-      const list = await googleListSpreadsheets();
+      const list = await listSpreadsheets();
       setFiles(list.map((f) => ({ id: f.id, name: f.name })));
     } catch (e: any) {
       setError(e?.message ?? "Failed to load spreadsheets");
@@ -162,7 +132,7 @@ export function SheetTabSelect({
       try {
         setBusy(true);
         setError(null);
-        const list = await googleGetSheetTabs(spreadsheetId);
+        const list = await getSheetTabs(spreadsheetId);
         setTabs(list);
       } catch (e: any) {
         setError(e?.message ?? "Failed to load tabs");

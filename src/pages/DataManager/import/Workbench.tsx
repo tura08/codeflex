@@ -1,27 +1,26 @@
+// src/pages/DataManager/import/Workbench.tsx
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import GroupingView from "./GroupingView";
-import MappingEditor from "./MappingEditor";
 import PreviewPanel from "./PreviewPanel";
-import { useImportController } from "./ImportControllerContext";
+import MappingEditor from "./MappingEditor";
+import { useImport } from "../context/ImportContext";
 
 export default function Workbench() {
-  const controller = useImportController();
-  const { headers, rows, mapping, setMapping } = controller.pipeline;
-  const { sheetName, datasetName, setDatasetName } = controller.source;
-  const { enabled: groupingEnabled, config: groupingConfig } = controller.grouping;
-
-  // Local UI state
+  const { state } = useImport();
   const [view, setView] = useState<"workbench" | "grouping">("workbench");
 
   const subtitle = useMemo(
-    () => (sheetName ? `Pick → Preview → Map → Group → Review → Save` : `Pick → Preview`),
-    [sheetName]
+    () => (state.sheetName ? `Pick → Preview → Map → Group → Review → Save` : `Pick → Preview`),
+    [state.sheetName]
   );
 
   if (view === "grouping") {
     return <GroupingView onClose={() => setView("workbench")} />;
   }
+
+  const groupingEnabled = state.groupingEnabled;
+  const groupKeys = state.groupingConfig?.groupBy ?? [];
 
   return (
     <div className="space-y-4">
@@ -31,9 +30,9 @@ export default function Workbench() {
           <h1 className="text-base font-semibold">Actions</h1>
           <p className="text-sm text-muted-foreground">
             {subtitle}
-            {groupingEnabled && groupingConfig?.groupBy?.length ? (
+            {groupingEnabled && groupKeys.length > 0 ? (
               <span className="ml-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-                Grouping ON (keys: {groupingConfig.groupBy.join(", ")})
+                Grouping ON (keys: {groupKeys.join(", ")})
               </span>
             ) : null}
           </p>
@@ -44,7 +43,7 @@ export default function Workbench() {
           <Button
             variant="outline"
             className="cursor-pointer"
-            disabled={!rows.length}
+            disabled={!state.rows.length}
             onClick={() => setView("grouping")}
           >
             Grouping
@@ -55,17 +54,10 @@ export default function Workbench() {
       {/* 2-column layout */}
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 xl:col-span-8 space-y-4">
-          <PreviewPanel headers={headers} rows={rows} mapping={mapping} />
+          <PreviewPanel />
         </div>
         <div className="col-span-12 xl:col-span-4 space-y-4">
-          <MappingEditor
-            headers={headers}
-            rows={rows}
-            mapping={mapping}
-            setMapping={setMapping}
-            datasetName={datasetName}
-            setDatasetName={setDatasetName}
-          />
+          <MappingEditor />
         </div>
       </div>
     </div>

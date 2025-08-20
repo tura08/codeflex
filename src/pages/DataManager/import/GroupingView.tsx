@@ -5,25 +5,47 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
-import { groupRecords, inferParentChildRoles, type GroupingConfig } from "@/lib/google/grouping";
-import { useImportController } from "./ImportControllerContext";
+import {
+  groupRecords,
+  inferParentChildRoles,
+  type GroupingConfig, // util's full type: { groupBy, parentFields?, childFields? }
+} from "@/lib/google/grouping";
+import { useImport } from "../context/ImportContext";
 
 type Props = { onClose?: () => void };
 
 export default function GroupingView({ onClose }: Props) {
-  const controller = useImportController();
+  const {
+    state,
+    setGroupingEnabled,
+    setGroupingConfig,
+  } = useImport();
 
-  // Data
-  const { mapping } = controller.pipeline;
-  const { records } = controller.dataset;
-  const { config: savedConfig } = controller.grouping;
-  const allFields = useMemo(() => mapping.map((m) => m.name), [mapping]);
+  // Derive field list and records from current preview
+  const allFields = useMemo(() => state.mapping.map((m) => m.name), [state.mapping]);
+
+  const records = useMemo(() => {
+    // rows: any[][]
+    // mapping: [{ name, ... }] -> use .name as object keys
+    if (!state.rows.length || !state.mapping.length) return [];
+    return state.rows.map((row) => {
+      const obj: Record<string, any> = {};
+      state.mapping.forEach((m, i) => {
+        obj[m.name] = row[i];
+      });
+      return obj;
+    });
+  }, [state.rows, state.mapping]);
 
   // Initial keys (saved or first field)
   const initialKeys: string[] =
-    savedConfig?.groupBy?.length ? savedConfig.groupBy : allFields[0] ? [allFields[0]] : [];
+    state.groupingConfig?.groupBy?.length
+      ? state.groupingConfig.groupBy
+      : allFields[0]
+      ? [allFields[0]]
+      : [];
 
-  // Local state
+  // Local UI state
   const [groupKeys, setGroupKeys] = useState<string[]>(initialKeys);
   const [searchGroupKeys, setSearchGroupKeys] = useState("");
   const [searchRoles, setSearchRoles] = useState("");
@@ -85,8 +107,8 @@ export default function GroupingView({ onClose }: Props) {
   const clearAllKeys = () => setGroupKeys([]);
 
   const applyAndClose = () => {
-    controller.grouping.setEnabled(true);
-    controller.grouping.setConfig(currentConfig);
+    setGroupingEnabled(true);
+    setGroupingConfig(currentConfig);
     onClose?.();
   };
 

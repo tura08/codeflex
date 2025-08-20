@@ -82,6 +82,48 @@ export function inferType(values: any[]): SimpleType {
 }
 
 /* -----------------------------------------------------------
+ * Public: robust inference (tolerates outliers)
+ * ---------------------------------------------------------*/
+function classifyValue(v: any): SimpleType | null {
+  if (v == null || (typeof v === "string" && v.trim() === "")) return null;
+  if (typeof v === "boolean") return "boolean";
+  if (typeof v === "number" && Number.isFinite(v)) return "number";
+
+  const s = String(v).trim();
+  const low = s.toLowerCase();
+
+  if (["true","false","1","0","yes","no","y","n"].includes(low)) return "boolean";
+  if (isLooseNumber(s) && !isLongIntegerLike(s)) return "number";
+  if (looksLikeDateString(s)) return "date";
+
+  return "string";
+}
+
+export function inferTypeRobust(values: any[], opts?: { tolerance?: number; minSample?: number }): SimpleType {
+  const tolerance = opts?.tolerance ?? 0.2;  // allow up to 20% outliers
+  const minSample = opts?.minSample ?? 8;    // need at least N non-blank samples
+
+  const sample: SimpleType[] = [];
+  for (const v of values) {
+    const t = classifyValue(v);
+    if (t) sample.push(t);
+    if (sample.length >= 200) break; // cap work
+  }
+  if (sample.length < minSample) return "string";
+
+  const counts: Record<SimpleType, number> = { string:0, number:0, boolean:0, date:0 };
+  for (const t of sample) counts[t]++;
+
+  // prefer non-string when close; order gives a slight bias
+  const order: SimpleType[] = ["date", "number", "boolean", "string"];
+  const top = order.slice().sort((a,b) => counts[b]-counts[a])[0];
+  const share = counts[top] / sample.length;
+
+  if (share < 1 - tolerance) return "string";
+  return top;
+}
+
+/* -----------------------------------------------------------
  * Public: value coercion to target type
  * ---------------------------------------------------------*/
 export function coerce(value: any, t: SimpleType, opts?: { dayFirst?: boolean }) {
@@ -190,14 +232,14 @@ export function detectColumnTypes(
   return out;
 }
 
-export function buildInitialMapping(
-  headers: string[],
-  inferred: Record<string, SimpleType>
-) {
-  const used = new Set<string>();
-  return headers.map((h, i) => ({
-    map_from: h,
-    name: normalizeHeader(h, i, used),
-    type: inferred[h] || "string",
-  }));
-}
+// export function buildInitialMapping(
+//   headers: string[],
+//   inferred: Record<string, SimpleType>
+// ) {
+//   const used = new Set<string>();
+//   return headers.map((h, i) => ({
+//     map_from: h,
+//     name: normalizeHeader(h, i, used),
+//     type: inferred[h] || "string",
+//   }));
+// }

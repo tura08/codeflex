@@ -1,7 +1,7 @@
 // src/pages/datamanager/layout/DataShell.tsx
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ImportControllerProvider } from "@/pages/DataManager/import/ImportControllerContext"; // keep provider; path can stay if file lives there
+import { ImportProvider } from "../context/ImportContext";
 
 type TopBarActionsCtx = { setTopBarActions: (node: React.ReactNode | null) => void };
 const TopBarCtx = createContext<TopBarActionsCtx | null>(null);
@@ -69,7 +69,9 @@ export default function DataShell() {
 
   return (
     <TopBarCtx.Provider value={value}>
-      <ImportControllerProvider>{ShellBody}</ImportControllerProvider>
+        <ImportProvider>
+          {ShellBody}
+        </ImportProvider>
     </TopBarCtx.Provider>
   );
 }
