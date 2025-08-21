@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/datasets/Datasets.tsx
+// src/pages/DataManager/Datasets.tsx
 import { useDatasetsList } from "@/pages/DataManager/hooks/useDatasetBrowser";
 import DatasetList from "./DatasetList";
 

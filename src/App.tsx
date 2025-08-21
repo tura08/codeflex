@@ -45,7 +45,7 @@ export default function App() {
                       <Route path="/apps/new" element={<NewApp />} />
                       <Route path="/apps/:id" element={<AppDetails />} />
 
-                      {/* SheetsManager app routes */}
+                      {/* DataManager app routes */}
                       <Route path="/datamanager/*" element={<SheetsShell />}>
                         <Route index element={<ImportPage />} />
                         <Route path="view" element={<ViewPage />} />

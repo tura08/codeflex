@@ -63,7 +63,6 @@ type Action =
   | { type: "SET_GROUPING_CONFIG"; config: GroupingConfig | null }
   // selection & row ops
   | { type: "TOGGLE_ROW_SELECTED"; index: number }
-  | { type: "SELECT_ALL" }
   | { type: "CLEAR_SELECTION" }
   | { type: "SELECT_ROWS"; indices: number[] }
   | { type: "REMOVE_SELECTED_ROWS" }
@@ -155,12 +154,6 @@ function reducer(state: State, action: Action): State {
       return { ...state, selectedRowIdx: next };
     }
 
-    case "SELECT_ALL": {
-      const all = new Set<number>();
-      for (let i = 0; i < state.rows.length; i++) all.add(i);
-      return { ...state, selectedRowIdx: all };
-    }
-
     case "CLEAR_SELECTION":
       return { ...state, selectedRowIdx: new Set<number>() };
 
@@ -241,7 +234,6 @@ export function useImportReducer(initial?: Partial<State>) {
 
   /* ---------- selection ops ---------- */
   const toggleRowSelected = useCallback((index: number) => dispatch({ type: "TOGGLE_ROW_SELECTED", index }), []);
-  const selectAllRows = useCallback(() => dispatch({ type: "SELECT_ALL" }), []);
   const clearSelection = useCallback(() => dispatch({ type: "CLEAR_SELECTION" }), []);
   const selectRows = useCallback((indices: number[]) => dispatch({ type: "SELECT_ROWS", indices }), []);
   const removeSelectedRows = useCallback(() => dispatch({ type: "REMOVE_SELECTED_ROWS" }), []);
@@ -327,7 +319,6 @@ export function useImportReducer(initial?: Partial<State>) {
     setDatasetName,
     // selection
     toggleRowSelected,
-    selectAllRows,
     clearSelection,
     selectRows,
     removeSelectedRows,

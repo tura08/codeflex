@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/datasets/components/DatasetList.tsx
+// src/pages/DataManager/DatasetList.tsx
 import { Link } from "react-router-dom";
 
 export default function DatasetList({ loading, datasets }: { loading: boolean; datasets: any[] }) {

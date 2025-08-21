@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/view/ViewPage.tsx
+// src/pages/DataManager/ViewPage.tsx
 import TopActionsView from "./TopActions.View";
 import Datasets from "./Datasets";
 

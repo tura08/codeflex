@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/components/TopActions.View.tsx
+// src/pages/DataManager/TopActions.View.tsx
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

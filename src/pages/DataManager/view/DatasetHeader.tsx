@@ -1,4 +1,4 @@
-// src/pages/apps/SheetsManager/datasets/components/DatasetHeader.tsx
+// src/pages/DataManager/DatasetHeader.tsx
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 

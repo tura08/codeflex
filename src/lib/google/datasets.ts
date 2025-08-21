@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase-client";
 import type { GroupingConfig } from "@/lib/google/grouping";
-import type { Mapping } from "@/integrations/google/types";
+import type { Mapping } from "@/pages/DataManager/hooks/useImportReducer";
 
 async function getUserId() {
   const { data } = await supabase.auth.getUser();
