@@ -81,6 +81,12 @@ export function inferType(values: any[]): SimpleType {
   return "string";
 }
 
+function isIdLikeWithSeparators(s: string): boolean {
+  // e.g. 408/25, 2025-00042, 12_34_56 — digits separated by / - _
+  // but exclude real dates we already catch earlier
+  return /^\d+(?:[\/\-_]\d+)+$/.test(s);
+}
+
 /* -----------------------------------------------------------
  * Public: robust inference (tolerates outliers)
  * ---------------------------------------------------------*/
@@ -92,33 +98,42 @@ function classifyValue(v: any): SimpleType | null {
   const s = String(v).trim();
   const low = s.toLowerCase();
 
-  if (["true","false","1","0","yes","no","y","n"].includes(low)) return "boolean";
-  if (isLooseNumber(s) && !isLongIntegerLike(s)) return "number";
+  // IMPORTANT: don't treat "1"/"0" as boolean; reserve boolean for words.
+  if (["true","false","yes","no","y","n"].includes(low)) return "boolean";
+
+  // Prefer date first (covers 04/08/2025, 04-08-2025, 04.08.2025, ISO, etc.)
   if (looksLikeDateString(s)) return "date";
+
+  // If it looks like an ID with separators, it's a string (e.g., 408/25)
+  if (isIdLikeWithSeparators(s)) return "string";
+
+  // Numeric-like (with thousands/decimal separators), guard against long integer IDs
+  if (isLooseNumber(s) && !isLongIntegerLike(s)) return "number";
 
   return "string";
 }
 
 export function inferTypeRobust(values: any[], opts?: { tolerance?: number; minSample?: number }): SimpleType {
-  const tolerance = opts?.tolerance ?? 0.2;  // allow up to 20% outliers
+  const tolerance = opts?.tolerance ?? 0.2;  // allow 20% outliers
   const minSample = opts?.minSample ?? 8;    // need at least N non-blank samples
 
   const sample: SimpleType[] = [];
   for (const v of values) {
     const t = classifyValue(v);
     if (t) sample.push(t);
-    if (sample.length >= 200) break; // cap work
+    if (sample.length >= 200) break;
   }
   if (sample.length < minSample) return "string";
 
   const counts: Record<SimpleType, number> = { string:0, number:0, boolean:0, date:0 };
   for (const t of sample) counts[t]++;
 
-  // prefer non-string when close; order gives a slight bias
+  // Order gives a tie-break preference to date > number > boolean > string
   const order: SimpleType[] = ["date", "number", "boolean", "string"];
   const top = order.slice().sort((a,b) => counts[b]-counts[a])[0];
   const share = counts[top] / sample.length;
 
+  // Too mixed? fall back to string
   if (share < 1 - tolerance) return "string";
   return top;
 }

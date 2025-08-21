@@ -1,9 +1,9 @@
 // src/pages/DataManager/import/TopActions.Import.tsx
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useTopBarActions } from "../layout/DataShell";
 import ConnectDialog from "./ConnectDialog";
 import { useImport } from "../context/ImportContext";
+import { useTopBarActions } from "../context/TopBarContext";
 
 function ToolbarInline({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
   const { state, saveImport } = useImport();

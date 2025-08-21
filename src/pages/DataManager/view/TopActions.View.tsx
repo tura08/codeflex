@@ -1,8 +1,8 @@
 // src/pages/apps/SheetsManager/components/TopActions.View.tsx
 import { useEffect } from "react";
-import { useTopBarActions } from "../layout/DataShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTopBarActions } from "../context/TopBarContext";
 
 export default function TopActionsView() {
   const set = useTopBarActions();

@@ -1,18 +1,16 @@
 // src/pages/DataManager/import/useValidation.ts
 import { useMemo } from "react";
-import { validate, qualityFromIssues } from "@/lib/google/validate";
+import { validate, qualityFromIssues, type Issue } from "@/lib/google/validate";
 import { useImport } from "../context/ImportContext";
 
 export function useValidation() {
   const { state } = useImport();
   const { rows, headers, mapping } = state;
 
-  // derive column types from mapping
   const types = useMemo(() => mapping.map((c) => c.type), [mapping]);
 
-  const issues = useMemo(() => {
+  const issues = useMemo<Issue[]>(() => {
     if (!headers.length || !rows.length) return [];
-    // IMPORTANT: validate must honor the passed `types`
     return validate(rows, headers, types);
   }, [rows, headers, types]);
 
@@ -21,5 +19,24 @@ export function useValidation() {
     [rows.length, headers.length, issues]
   );
 
-  return { issues, stats, rowsLen: rows.length, colsLen: headers.length };
+  const errorRowIndices = useMemo(() => {
+    const set = new Set<number>();
+    for (const it of issues) if (it.level === "error") set.add(it.row);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [issues]);
+
+  const warningRowIndices = useMemo(() => {
+    const set = new Set<number>();
+    for (const it of issues) if (it.level === "warning") set.add(it.row);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [issues]);
+
+  return {
+    issues,
+    stats,
+    rowsLen: rows.length,
+    colsLen: headers.length,
+    errorRowIndices,
+    warningRowIndices,
+  };
 }

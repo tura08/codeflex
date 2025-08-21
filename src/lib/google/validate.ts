@@ -1,6 +1,5 @@
 // src/lib/tabular/validate.ts
-import type { SimpleType } from "@/lib/google/infer"; // keep your current infer file
-import { coerce } from "@/lib/google/infer";
+import type { SimpleType } from "@/lib/google/infer";
 
 export type IssueLevel = "error" | "warning" | "info";
 export type Issue = {
@@ -19,6 +18,7 @@ export type QualityStats = {
   warnings: number;
 };
 
+/* ── Helpers ─────────────────────────────────────────────── */
 function isBlank(v: unknown) {
   return v === null || v === undefined || (typeof v === "string" && v.trim() === "");
 }
@@ -55,6 +55,7 @@ function parseDateLoose(v: unknown, dayFirst = true): Date | null {
   return null;
 }
 
+/* ── Validation ──────────────────────────────────────────── */
 export function validate(
   rows: any[][],
   headers: string[],
@@ -62,8 +63,8 @@ export function validate(
   required?: string[]
 ): Issue[] {
   const issues: Issue[] = [];
-  const idx = (name: string) => headers.findIndex((h) => h === name);
-  const requiredIdx = (required ?? []).map(idx).filter((i) => i >= 0);
+  const idx = (name: string) => headers.findIndex(h => h === name);
+  const requiredIdx = (required ?? []).map(idx).filter(i => i >= 0);
 
   rows.forEach((row, r) => {
     // required empties
@@ -79,14 +80,26 @@ export function validate(
       }
     }
 
-    // type checks
     types.forEach((t, i) => {
       const v = row[i];
+      // allow blanks for non-required
       if (isBlank(v)) return;
 
       if (t === "number") {
-        const n = coerce(v, "number");
-        if (n === null) {
+        // STRICT number check
+        const sRaw = typeof v === "number" ? String(v) : String(v).trim();
+
+        // Accept a leading minus sign (numeric negative), but treat hyphen *between* digits as date-like.
+        const hasSlash = sRaw.includes("/");
+        const hyphenBetweenDigits = /\d-\d/.test(sRaw); // "2025-08-04", "12-05", etc.
+        const hasDateSeparators = hasSlash || hyphenBetweenDigits;
+
+        // Numeric pattern – allows [-] digits, thousand separators and decimals.
+        const looksNumeric = typeof v === "number"
+          ? Number.isFinite(v)
+          : /^-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?$|-?\d+(?:[.,]\d+)?$/.test(sRaw);
+
+        if (!looksNumeric || hasDateSeparators) {
           issues.push({
             level: "error",
             message: "Invalid number",
@@ -103,6 +116,7 @@ export function validate(
         else if (typeof v === "string") {
           ok = !!(parseDateLoose(v, true) || parseDateLoose(v, false));
         }
+        // numeric serials are NOT accepted
         if (!ok) {
           issues.push({
             level: "error",
@@ -115,8 +129,9 @@ export function validate(
       }
 
       if (t === "boolean") {
+        // Strict: textual only (we intentionally do NOT accept "1"/"0" here)
         const s = String(v).trim().toLowerCase();
-        const ok = typeof v === "boolean" || ["true", "false", "1", "0", "yes", "no", "y", "n"].includes(s);
+        const ok = typeof v === "boolean" || ["true","false","yes","no","y","n"].includes(s);
         if (!ok) {
           issues.push({
             level: "warning",
