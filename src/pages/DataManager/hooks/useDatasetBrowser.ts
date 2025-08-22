@@ -85,12 +85,7 @@ async function fetchRows(params: {
   return { data: (data ?? []) as any[], count: count ?? 0 };
 }
 
-async function fetchChildren(params: {
-  datasetId: string;
-  batchId: string;
-  groupKey: string;
-}): Promise<any[]> {
-  const { datasetId, batchId, groupKey } = params;
+export async function fetchChildren(datasetId: string, batchId: string, groupKey: string): Promise<any[]> {
   const { data, error } = await supabase
     .from("v_dataset_children")
     .select("id,data,group_key")
@@ -162,6 +157,7 @@ export function useDatasetDetail(params: {
   // rows
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState<number>(0);
+  const [allColumns, setAllColumns] = useState<string[]>([]);
 
   // ui
   const [loading, setLoading] = useState(true);
@@ -171,47 +167,67 @@ export function useDatasetDetail(params: {
   const effectiveBatchId = useMemo(() => chosenBatchId ?? batchId ?? null, [chosenBatchId, batchId]);
 
   /** Load meta + batches for a dataset id */
-  const loadMetaAndBatches = useCallback(
-    async (id: string) => {
-      setError(null);
-      // meta
-      const meta = await fetchDatasetMeta(id);
-      setDataset(meta);
-      setMode(meta?.grouping_enabled ? "grouped" : "flat");
+  const refreshMeta = useCallback(async () => {
+    if (!datasetId) return;
+    const meta = await fetchDatasetMeta(datasetId);
+    setDataset(meta);
+    setMode(meta?.grouping_enabled ? "grouped" : "flat");
+  }, [datasetId]);
 
-      // batches
-      const stamps = await fetchBatchStamps(id);
-      const computed = computeBatches(stamps);
-      setBatches(computed);
-
-      // default to latest if no batch requested
-      if (!batchId && computed.length) setChosenBatchId(computed[0].id);
-    },
-    [batchId]
-  );
+  const refreshBatches = useCallback(async () => {
+    if (!datasetId) return;
+    const stamps = await fetchBatchStamps(datasetId);
+    const computed = computeBatches(stamps);
+    setBatches(computed);
+    if (!batchId && computed.length) setChosenBatchId(computed[0].id);
+  }, [datasetId, batchId]);
 
   /** Load a page of rows */
-  const loadPageRows = useCallback(
-    async (args: { id: string; m: Mode; currentBatch: string; currentPage: number; size: number; query?: string }) => {
-      const { id, m, currentBatch, currentPage, size, query } = args;
-      const table = m === "grouped" ? "v_dataset_parents" : "v_dataset_flat";
-      const from = (currentPage - 1) * size;
-      const to = from + size - 1;
-      const { data, count } = await fetchRows({ datasetId: id, table, batchId: currentBatch, from, to, q: query });
-      setRows(data);
-      setTotal(count);
+  const refreshRows = useCallback(async () => {
+    if (!datasetId || !effectiveBatchId) {
+      setRows([]);
+      setTotal(0);
+      return;
+    }
+    const table = mode === "grouped" ? "v_dataset_parents" : "v_dataset_flat";
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data, count } = await fetchRows({
+      datasetId,
+      table,
+      batchId: effectiveBatchId,
+      from,
+      to,
+      q,
+    });
+    setRows(data);
+    setTotal(count);
+    if (data.length > 0) setAllColumns(Object.keys(data[0]?.data || {}));
+  }, [datasetId, effectiveBatchId, mode, page, pageSize, q]);
+
+  /** Load children for a given group key (parents → children) */
+  const loadChildren = useCallback(
+    async (groupKey: string) => {
+      if (!datasetId || !effectiveBatchId || !groupKey) return [];
+      return fetchChildren(datasetId, effectiveBatchId, groupKey);
     },
-    []
+    [datasetId, effectiveBatchId]
   );
 
-  /** Effect: meta + batches (runs when datasetId changes) */
+  /** Refresh all */
+  const refreshAll = useCallback(async () => {
+    await refreshMeta();
+    await refreshBatches();
+    await refreshRows();
+  }, [refreshMeta, refreshBatches, refreshRows]);
+
+  /** Effect: initial load */
   useEffect(() => {
-    if (!datasetId) return;
     let alive = true;
-    setLoading(true);
     (async () => {
+      setLoading(true);
       try {
-        await loadMetaAndBatches(datasetId);
+        await refreshAll();
       } catch (e: any) {
         if (alive) setError(e?.message ?? "Failed to load dataset");
       } finally {
@@ -221,70 +237,12 @@ export function useDatasetDetail(params: {
     return () => {
       alive = false;
     };
-  }, [datasetId, loadMetaAndBatches]);
+  }, [refreshAll]);
 
   /** Effect: rows (runs when page, batch, mode, or query changes) */
   useEffect(() => {
-    if (!datasetId || !effectiveBatchId) {
-      setRows([]);
-      setTotal(0);
-      setLoading(false);
-      return;
-    }
-    let alive = true;
-    setLoading(true);
-    (async () => {
-      try {
-        await loadPageRows({
-          id: datasetId,
-          m: mode,
-          currentBatch: effectiveBatchId,
-          currentPage: page,
-          size: pageSize,
-          query: q,
-        });
-      } catch (e: any) {
-        if (alive) setError(e?.message ?? "Failed to load rows");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [datasetId, effectiveBatchId, mode, page, pageSize, q, loadPageRows]);
-
-  /** Public API */
-  const setBatchId = useCallback((id: string | null) => setChosenBatchId(id), []);
-  const refreshMeta = useCallback(async () => {
-    if (!datasetId) return;
-    await loadMetaAndBatches(datasetId);
-  }, [datasetId, loadMetaAndBatches]);
-
-  const refreshRows = useCallback(async () => {
-    if (!datasetId || !effectiveBatchId) return;
-    await loadPageRows({
-      id: datasetId,
-      m: mode,
-      currentBatch: effectiveBatchId,
-      currentPage: page,
-      size: pageSize,
-      query: q,
-    });
-  }, [datasetId, effectiveBatchId, mode, page, pageSize, q, loadPageRows]);
-
-  const refreshAll = useCallback(async () => {
-    await refreshMeta();
-    await refreshRows();
-  }, [refreshMeta, refreshRows]);
-
-  const loadChildren = useCallback(
-    async (groupKey: string) => {
-      if (!datasetId || !effectiveBatchId || !groupKey) return [];
-      return fetchChildren({ datasetId, batchId: effectiveBatchId, groupKey });
-    },
-    [datasetId, effectiveBatchId]
-  );
+    refreshRows();
+  }, [effectiveBatchId, mode, page, pageSize, q, refreshRows]);
 
   return {
     // meta
@@ -296,17 +254,19 @@ export function useDatasetDetail(params: {
     // batches
     batches,
     batchId: effectiveBatchId,
-    setBatchId,
+    setBatchId: setChosenBatchId,
 
     // rows
     rows,
     total,
+    allColumns,
 
     // commands
-    refresh: refreshAll,
     refreshMeta,
+    refreshBatches,
     refreshRows,
-    loadChildren,
+    refreshAll,
+    loadChildren, // ✅ now exposed to consumers
   };
 }
 

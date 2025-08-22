@@ -36,8 +36,9 @@ export default function DatasetDetail() {
   const [alsoDeleteSource, setAlsoDeleteSource] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Data (Phase 1: batch intentionally omitted)
-  const pageSize = 50;
+  // Phase 1: keep batch out of scope
+  const [pageSize, setPageSize] = useState<number>(50);
+
   const {
     loading,
     dataset,
@@ -45,7 +46,8 @@ export default function DatasetDetail() {
     rows,
     total,
     error,
-    loadChildren,
+    loadChildren, // (from your hook)
+    allColumns,   // ✅ NEW: full list of keys from dataset rows
   } = useDatasetDetail({ datasetId: id, page, pageSize, batchId: null, q });
 
   const pageCount = useMemo(
@@ -175,7 +177,7 @@ export default function DatasetDetail() {
             Rows: {loading ? "…" : total}
           </span>
         </div>
-        {/* (Phase 2) controls (batch/filters/columns) can go here */}
+        {/* (Phase 2+) controls (batch/filters/columns) can go here */}
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
@@ -186,8 +188,15 @@ export default function DatasetDetail() {
           loading={loading}
           mode={mode}
           rows={rows}
+          allColumns={allColumns}   // ✅ pass full column list
           page={page}
           pageCount={pageCount}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            sp.set("page", "1");
+            setSp(sp, { replace: true });
+          }}
           onPageChange={(p) => {
             sp.set("page", String(p));
             setSp(sp, { replace: true });

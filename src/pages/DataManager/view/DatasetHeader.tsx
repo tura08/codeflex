@@ -1,10 +1,9 @@
 // src/pages/DataManager/DatasetHeader.tsx
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import type { Batch } from "../hooks/useDatasetBrowser";
 
-type Batch = { id: string; imported_at: string };
-
-export default function DatasetHeader(props: {
+type Props = {
   groupingEnabled: boolean;
   batches: Batch[];
   batchId: string | null;
@@ -12,14 +11,22 @@ export default function DatasetHeader(props: {
   q: string;
   onSearch: (q: string) => void;
   loading: boolean;
-}) {
-  const { groupingEnabled, batches, batchId, onBatchChange, q, onSearch, loading } = props;
+};
 
+export default function DatasetHeader({
+  groupingEnabled,
+  batches,
+  batchId,
+  onBatchChange,
+  q,
+  onSearch,
+  loading,
+}: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2 justify-between border rounded-xl p-3">
       <div className="text-sm">
         <span className="mr-2">Structure:</span>
-        <span className={`inline-flex px-2 py-0.5 rounded-full border ${groupingEnabled ? "" : ""}`}>
+        <span className="inline-flex px-2 py-0.5 rounded-full border">
           {groupingEnabled ? "Grouping ON" : "Grouping OFF"}
         </span>
       </div>
@@ -43,9 +50,14 @@ export default function DatasetHeader(props: {
           placeholder="Search…"
           className="w-48"
           defaultValue={q}
-          onKeyDown={(e) => { if (e.key === "Enter") onSearch((e.target as HTMLInputElement).value); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter")
+              onSearch((e.target as HTMLInputElement).value);
+          }}
         />
-        <Button variant="outline" onClick={() => onSearch("")}>Clear</Button>
+        <Button variant="outline" onClick={() => onSearch("")}>
+          Clear
+        </Button>
       </div>
     </div>
   );
