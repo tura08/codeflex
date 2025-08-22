@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
+// src/pages/DataManager/DatasetDetail.tsx
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ export default function DatasetDetail() {
   const id = routeId ?? "";
   const [sp, setSp] = useSearchParams();
 
+  // URL state
   const page = Number(sp.get("page") || 1);
   const q = sp.get("q") || "";
 
@@ -36,9 +38,10 @@ export default function DatasetDetail() {
   const [alsoDeleteSource, setAlsoDeleteSource] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Phase 1: keep batch out of scope
+  // Page size
   const [pageSize, setPageSize] = useState<number>(50);
 
+  // Hook
   const {
     loading,
     dataset,
@@ -46,16 +49,13 @@ export default function DatasetDetail() {
     rows,
     total,
     error,
-    loadChildren, // (from your hook)
-    allColumns,   // ✅ NEW: full list of keys from dataset rows
+    loadChildren,   // may be present; we guard usage below
+    allColumns = [], // ✅ needed by DataTable
   } = useDatasetDetail({ datasetId: id, page, pageSize, batchId: null, q });
 
-  const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(total / pageSize)),
-    [total, pageSize]
-  );
+  const pageCount = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
 
-  // Search input state synced with URL
+  // Search input mirrors URL
   const [searchInput, setSearchInput] = useState(q);
   useEffect(() => setSearchInput(q), [q]);
 
@@ -74,16 +74,14 @@ export default function DatasetDetail() {
 
         <Dialog open={openDelete} onOpenChange={setOpenDelete}>
           <DialogTrigger asChild>
-            <Button variant="destructive" size="sm">
-              Delete dataset
-            </Button>
+            <Button variant="destructive" size="sm">Delete dataset</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Delete dataset</DialogTitle>
               <DialogDescription>
-                This will permanently delete all imported rows and column mappings
-                for <b>{dataset?.name}</b>. This action cannot be undone.
+                This will permanently delete all imported rows and column mappings for{" "}
+                <b>{dataset?.name}</b>. This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
 
@@ -113,25 +111,16 @@ export default function DatasetDetail() {
                   checked={alsoDeleteSource}
                   onChange={(e) => setAlsoDeleteSource(e.target.checked)}
                 />
-                Also delete the linked <code>sheet_source</code> if unused by
-                other datasets
+                Also delete the linked <code>sheet_source</code> if unused by other datasets
               </label>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setOpenDelete(false)}
-                  disabled={deleting}
-                >
+                <Button variant="outline" onClick={() => setOpenDelete(false)} disabled={deleting}>
                   Cancel
                 </Button>
                 <Button
                   variant="destructive"
-                  disabled={
-                    !doubleCheck ||
-                    confirmText.trim() !== (dataset?.name ?? "") ||
-                    deleting
-                  }
+                  disabled={!doubleCheck || confirmText.trim() !== (dataset?.name ?? "") || deleting}
                   onClick={async () => {
                     if (!id) return;
                     try {
@@ -141,9 +130,7 @@ export default function DatasetDetail() {
                       setOpenDelete(false);
                       window.location.assign("/datamanager/view/datasets");
                     } catch (e: any) {
-                      toast.error("Delete failed", {
-                        description: e?.message ?? "Unknown error",
-                      });
+                      toast.error("Delete failed", { description: e?.message ?? "Unknown error" });
                     } finally {
                       setDeleting(false);
                     }
@@ -173,11 +160,9 @@ export default function DatasetDetail() {
               setSp(sp, { replace: true });
             }}
           />
-          <span className="text-xs text-muted-foreground">
-            Rows: {loading ? "…" : total}
-          </span>
+          <span className="text-xs text-muted-foreground">Rows: {loading ? "…" : total}</span>
         </div>
-        {/* (Phase 2+) controls (batch/filters/columns) can go here */}
+        {/* Future: batch picker / extra actions */}
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
@@ -185,10 +170,11 @@ export default function DatasetDetail() {
       {/* Table in fixed-height card */}
       <Card className="h-[68vh] p-3">
         <DataTable
+          datasetId={id}
+          allColumns={allColumns}
           loading={loading}
           mode={mode}
           rows={rows}
-          allColumns={allColumns}   // ✅ pass full column list
           page={page}
           pageCount={pageCount}
           pageSize={pageSize}
@@ -204,8 +190,13 @@ export default function DatasetDetail() {
           onLoadChildren={
             mode === "grouped"
               ? async (groupKey: string) => {
-                  const list = await loadChildren(groupKey);
-                  return Array.isArray(list) ? list.slice(0, 50) : [];
+                  try {
+                    // Guard if your hook version doesn't expose loadChildren
+                    const list = await (loadChildren?.(groupKey) ?? Promise.resolve([]));
+                    return Array.isArray(list) ? list.slice(0, 50) : [];
+                  } catch {
+                    return [];
+                  }
                 }
               : undefined
           }

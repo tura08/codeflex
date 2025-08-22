@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAllColumns } from "./TableHelpers";
 
+/** Exported types so other files can import them */
 export type Mode = "grouped" | "flat";
 export type Row = { id: string; role: string; group_key?: string; data: Record<string, any> };
 
@@ -88,7 +89,12 @@ export function DataTableRow({
       </tr>
 
       {mode === "grouped" && isOpen && (
-        <DataTableChildren colSpan={colSpan} columns={childColumns} rows={childrenRows} formatCell={formatCell} />
+        <DataTableChildren
+          colSpan={colSpan}
+          columns={childColumns}
+          rows={childrenRows}
+          formatCell={formatCell}
+        />
       )}
     </>
   );

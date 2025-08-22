@@ -78,7 +78,7 @@ async function fetchRows(params: {
     .range(from, to)
     .order("id", { ascending: true });
 
-  if (q && q.trim()) qy = qy.ilike("data::text", `%${q}%`);
+  if (q && q.trim()) qy = qy.ilike("data_text", `%${q}%`);
 
   const { data, count, error } = await qy;
   if (error) throw error;

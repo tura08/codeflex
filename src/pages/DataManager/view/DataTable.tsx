@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { ColumnsDropdown, EmptyOrLoading, TableFrame, TablePagination, useAllColumns, formatCell } from "./TableHelpers";
-import { DataTableHeader, DataTableRow } from "./DataTableParts";
-
-export type Mode = "grouped" | "flat";
-export type Row = { id: string; role: string; group_key?: string; data: Record<string, any> };
+import { Button } from "@/components/ui/button";
+import ColumnManagerModal from "./ColumnManagerModal";
+import {
+  EmptyOrLoading,
+  TableFrame,
+  TablePagination,
+  formatCell,
+  readColumnsFromUrl,
+  storageKeyForColumns,
+  writeColumnsToUrl,
+} from "./TableHelpers";
+import { DataTableHeader, DataTableRow, type Mode, type Row } from "./DataTableParts";
 
 const DEFAULT_VISIBLE = 8;
 
 export default function DataTable({
+  datasetId,
   loading,
   mode,
   rows,
@@ -19,10 +27,11 @@ export default function DataTable({
   onPageSizeChange,
   onLoadChildren,
 }: {
+  datasetId: string;
   loading: boolean;
   mode: Mode;
   rows: Row[];
-  allColumns: string[];                  // ✅ full list of columns from hook
+  allColumns: string[];
   page: number;
   pageCount: number;
   pageSize: number;
@@ -30,6 +39,7 @@ export default function DataTable({
   onPageSizeChange: (s: number) => void;
   onLoadChildren?: (groupKey: string) => Promise<Row[]>;
 }) {
+  // expansion & child cache
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [childrenCache, setChildrenCache] = useState<Record<string, Row[]>>({});
 
@@ -38,23 +48,39 @@ export default function DataTable({
     setChildrenCache({});
   }, [mode, page]);
 
-  // ---------- Column visibility ----------
+  // column visibility state + modal
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+  const [managerOpen, setManagerOpen] = useState(false);
+
+  // hydrate from URL > localStorage > default(first N)
+  useEffect(() => {
+    const urlCols = readColumnsFromUrl();
+    const lsCols = (() => {
+      try {
+        const text = localStorage.getItem(storageKeyForColumns(datasetId));
+        return text ? (JSON.parse(text) as string[]) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    const initial: string[] =
+      (urlCols && urlCols.filter((c) => allColumns.includes(c))) ||
+      (lsCols && lsCols.filter((c) => allColumns.includes(c))) ||
+      allColumns.slice(0, DEFAULT_VISIBLE);
+
+    const map: Record<string, boolean> = {};
+    allColumns.forEach((c) => (map[c] = initial.includes(c)));
+    if (!Object.values(map).some(Boolean) && allColumns[0]) map[allColumns[0]] = true;
+    setVisible(map);
+  }, [datasetId, allColumns]);
+
+  // keep visible map in sync if the source columns change
   useEffect(() => {
     setVisible((prev) => {
-      const next: Record<string, boolean> = { ...prev };
-      // add new keys (default visible only for the first DEFAULT_VISIBLE)
-      allColumns.forEach((c, i) => {
-        if (!(c in next)) next[c] = i < DEFAULT_VISIBLE;
-      });
-      // drop removed keys
-      Object.keys(next).forEach((k) => {
-        if (!allColumns.includes(k)) delete next[k];
-      });
-      // ensure at least one visible
-      if (Object.values(next).every((v) => !v) && allColumns[0]) {
-        next[allColumns[0]] = true;
-      }
+      const next: Record<string, boolean> = {};
+      allColumns.forEach((c) => (next[c] = prev[c] ?? false));
+      if (!Object.values(next).some(Boolean) && allColumns[0]) next[allColumns[0]] = true;
       return next;
     });
   }, [allColumns]);
@@ -64,17 +90,24 @@ export default function DataTable({
     [allColumns, visible]
   );
 
-  // ---------- Empty / Loading ----------
+  // persist chosen columns
+  const persistVisible = (cols: string[]) => {
+    writeColumnsToUrl(cols);
+    try {
+      localStorage.setItem(storageKeyForColumns(datasetId), JSON.stringify(cols));
+    } catch {
+      /* no-op */
+    }
+  };
+
+  // early frame for loading/empty
   if (loading || !rows?.length) {
     return (
       <TableFrame>
-        <div className="mb-2 flex items-center justify-end">
-          <ColumnsDropdown
-            columns={allColumns}
-            visible={visible}
-            onToggle={() => {}}
-            disabled
-          />
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => setManagerOpen(true)}>
+            Manage columns
+          </Button>
         </div>
 
         <EmptyOrLoading
@@ -84,11 +117,25 @@ export default function DataTable({
           pageSize={pageSize}
           onPageSizeChange={onPageSizeChange}
         />
+
+        <ColumnManagerModal
+          open={managerOpen}
+          onOpenChange={setManagerOpen}
+          all={allColumns}
+          initialVisible={visibleColumns}
+          onApply={(next) => {
+            const map: Record<string, boolean> = {};
+            allColumns.forEach((c) => (map[c] = next.includes(c)));
+            if (!next.length && allColumns[0]) map[allColumns[0]] = true;
+            setVisible(map);
+            persistVisible(next.length ? next : [allColumns[0]].filter(Boolean));
+          }}
+        />
       </TableFrame>
     );
   }
 
-  // ---------- Expand children ----------
+  // expand children (loads once per group_key)
   const toggleExpand = async (row: Row) => {
     const key = row.group_key ?? String(row.id);
     const next = !expanded[key];
@@ -101,23 +148,14 @@ export default function DataTable({
 
   return (
     <TableFrame>
-      {/* Toolbar: column visibility */}
-      <div className="mb-2 flex items-center justify-end">
-        <ColumnsDropdown
-          columns={allColumns}
-          visible={visible}
-          onToggle={(col) => {
-            setVisible((s) => {
-              const count = Object.values(s).filter(Boolean).length;
-              const nextVal = !s[col];
-              if (!nextVal && count <= 1) return s; // don't hide last column
-              return { ...s, [col]: nextVal };
-            });
-          }}
-        />
+      {/* Toolbar */}
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setManagerOpen(true)}>
+          Manage columns
+        </Button>
       </div>
 
-      {/* Scrollable area */}
+      {/* Scrollable rows area */}
       <div className="flex-1 overflow-auto rounded-xl border">
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
           <DataTableHeader mode={mode} columns={visibleColumns} />
@@ -148,6 +186,21 @@ export default function DataTable({
         pageSize={pageSize}
         onPageChange={onPageChange}
         onPageSizeChange={onPageSizeChange}
+      />
+
+      {/* Column manager modal */}
+      <ColumnManagerModal
+        open={managerOpen}
+        onOpenChange={setManagerOpen}
+        all={allColumns}
+        initialVisible={visibleColumns}
+        onApply={(next) => {
+          const map: Record<string, boolean> = {};
+          allColumns.forEach((c) => (map[c] = next.includes(c)));
+          if (!next.length && allColumns[0]) map[allColumns[0]] = true;
+          setVisible(map);
+          persistVisible(next.length ? next : [allColumns[0]].filter(Boolean));
+        }}
       />
     </TableFrame>
   );

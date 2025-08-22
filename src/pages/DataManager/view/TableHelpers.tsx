@@ -32,7 +32,6 @@ export function EmptyOrLoading({
   return (
     <>
       <div className="flex-1 overflow-auto rounded-xl border bg-background">
-        {/* Skeleton table */}
         <div className="p-3">
           <div className="mb-2 grid grid-cols-10 gap-2">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -80,7 +79,6 @@ export function TablePagination({
 }) {
   return (
     <div className="mt-3 flex items-center justify-between gap-4">
-      {/* Page size selector */}
       <div className="flex items-center gap-2 text-xs">
         <span>Rows per page:</span>
         <select
@@ -97,7 +95,6 @@ export function TablePagination({
         </select>
       </div>
 
-      {/* Pagination controls */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -123,45 +120,6 @@ export function TablePagination({
   );
 }
 
-/* ---------- Column visibility dropdown ---------- */
-export function ColumnsDropdown({
-  columns,
-  visible,
-  onToggle,
-  disabled,
-}: {
-  columns: string[];
-  visible: Record<string, boolean>;
-  onToggle: (col: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
-          Columns
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {columns.length === 0 && (
-          <div className="px-2 py-1 text-xs text-muted-foreground">No columns</div>
-        )}
-        {columns.map((c) => (
-          <DropdownMenuCheckboxItem
-            key={c}
-            checked={!!visible[c]}
-            onCheckedChange={() => onToggle(c)}
-          >
-            {c}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /* ---------- Helpers ---------- */
 export function useAllColumns(rows: Array<{ data?: Record<string, any> }>) {
   return useMemo(() => {
@@ -174,4 +132,36 @@ export function formatCell(v: any) {
   if (v === null || v === undefined) return "—";
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+/* ---------- Persistence helpers (URL + localStorage) ---------- */
+export function storageKeyForColumns(datasetId: string) {
+  return `dm:view:cols:${datasetId}`;
+}
+
+export function readColumnsFromUrl(): string[] | null {
+  try {
+    const url = new URL(window.location.href);
+    const val = url.searchParams.get("cols");
+    if (!val) return null;
+    const cols = val.split(",").map((s) => s.trim()).filter(Boolean);
+    return cols.length ? cols : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeColumnsToUrl(cols: string[]) {
+  try {
+    const url = new URL(window.location.href);
+    if (cols.length) {
+      url.searchParams.set("cols", cols.join(","));
+    } else {
+      url.searchParams.delete("cols");
+    }
+    // keep history clean: replace, don't push
+    window.history.replaceState({}, "", url.toString());
+  } catch {
+    /* no-op */
+  }
 }
