@@ -1,10 +1,10 @@
+// src/pages/DataManager/hooks/useViewReducer.ts
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   getDatasetMeta,
   listRows,
   listChildren,
-  deleteDatasetDeep,
   listBatchStamps,
   computeBatches,
   type DatasetMeta,
@@ -13,9 +13,10 @@ import {
   type Mode,
 } from "@/lib/datamanager/api";
 
-export type SortDir = "asc" | "desc" | null;
+/** Minimal sort model: only direction for now */
+export type SortDir = "asc" | "desc";
 
-type State = {
+type ReducerState = {
   // identity
   datasetId: string;
 
@@ -23,10 +24,7 @@ type State = {
   page: number;
   pageSize: number;
   q: string;
-  sortBy: string | null;
   sortDir: SortDir;
-  filterField: string | null;
-  filterValue: string | null;
 
   // server selection
   mode: Mode;
@@ -46,27 +44,24 @@ type State = {
   // status
   loading: boolean;
   error: string | null;
-  deleting: boolean;
 };
 
 type Action =
-  | { type: "INIT"; payload: Partial<State> }
-  | { type: "PATCH"; patch: Partial<State> }
+  | { type: "INIT"; payload: Partial<ReducerState> }
+  | { type: "PATCH"; patch: Partial<ReducerState> }
   | { type: "SET_META"; dataset: DatasetMeta; mode: Mode }
   | { type: "SET_BATCHES"; batches: Batch[]; batchId: string | null }
   | { type: "SET_ROWS"; rows: Row[]; total: number }
   | { type: "TOGGLE_EXPANDED"; key: string }
   | { type: "SET_CHILDREN"; key: string; rows: Row[] };
 
-const initialState: State = {
+const initialState: ReducerState = {
   datasetId: "",
+
   page: 1,
   pageSize: 50,
   q: "",
-  sortBy: null,
-  sortDir: null,
-  filterField: null,
-  filterValue: null,
+  sortDir: "asc",
 
   mode: "flat",
   batchId: null,
@@ -82,14 +77,16 @@ const initialState: State = {
 
   loading: true,
   error: null,
-  deleting: false,
 };
 
 function storageKey(datasetId: string) {
   return `dm:cols:${datasetId}`;
 }
 
-function reducer(state: State, action: Action): State {
+/* ──────────────────────────────────────────────────────────────
+ * Reducer
+ * ────────────────────────────────────────────────────────────── */
+function reducer(state: ReducerState, action: Action): ReducerState {
   switch (action.type) {
     case "INIT":
       return { ...state, ...action.payload };
@@ -120,6 +117,9 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+/* ──────────────────────────────────────────────────────────────
+ * Hook
+ * ────────────────────────────────────────────────────────────── */
 export function useViewReducer(datasetId: string) {
   const [sp, setSp] = useSearchParams();
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -129,16 +129,15 @@ export function useViewReducer(datasetId: string) {
     const page = Number(sp.get("page") || 1);
     const pageSize = Number(sp.get("pp") || 50);
     const q = sp.get("q") || "";
-    const sortBy = sp.get("sort") || null;
-    const sortDir = (sp.get("dir") as SortDir) || null;
-    const filterField = sp.get("f_field") || null;
-    const filterValue = sp.get("f_value") || null;
+    const dir = (sp.get("dir") as SortDir) || "asc";
 
     let visibleColumns: string[] = [];
     try {
       const raw = localStorage.getItem(storageKey(datasetId));
       visibleColumns = raw ? (JSON.parse(raw) as string[]) : [];
-    } catch {/* noop */}
+    } catch (e) {
+      console.log(e)
+    }
 
     dispatch({
       type: "INIT",
@@ -147,10 +146,7 @@ export function useViewReducer(datasetId: string) {
         page,
         pageSize,
         q,
-        sortBy,
-        sortDir,
-        filterField,
-        filterValue,
+        sortDir: dir,
         visibleColumns,
         loading: true,
         error: null,
@@ -166,23 +162,9 @@ export function useViewReducer(datasetId: string) {
     next.set("page", String(state.page));
     next.set("pp", String(state.pageSize));
     state.q ? next.set("q", state.q) : next.delete("q");
-    state.sortBy ? next.set("sort", state.sortBy) : next.delete("sort");
-    state.sortDir ? next.set("dir", state.sortDir) : next.delete("dir");
-    state.filterField ? next.set("f_field", state.filterField) : next.delete("f_field");
-    state.filterValue ? next.set("f_value", state.filterValue) : next.delete("f_value");
+    next.set("dir", state.sortDir);
     setSp(next, { replace: true });
-  }, [
-    state.datasetId,
-    state.page,
-    state.pageSize,
-    state.q,
-    state.sortBy,
-    state.sortDir,
-    state.filterField,
-    state.filterValue,
-    sp,
-    setSp,
-  ]);
+  }, [state.datasetId, state.page, state.pageSize, state.q, state.sortDir, sp, setSp]);
 
   // --- loaders ---
   const loadMeta = useCallback(async () => {
@@ -212,10 +194,7 @@ export function useViewReducer(datasetId: string) {
         page: state.page,
         pageSize: state.pageSize,
         q: state.q,
-        sortBy: state.sortBy,
         sortDir: state.sortDir,
-        filterField: state.filterField,
-        filterValue: state.filterValue,
       });
       dispatch({ type: "SET_ROWS", rows: data, total: count });
 
@@ -223,22 +202,13 @@ export function useViewReducer(datasetId: string) {
       if (!state.visibleColumns.length && data.length) {
         const first = Object.keys(data[0]?.data ?? {}).slice(0, 8);
         dispatch({ type: "PATCH", patch: { visibleColumns: first } });
-        try { localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first)); } catch {/* noop */}
+        try {
+          localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first));
+        } catch {
+          /* noop */
+        }
       }
-    },
-    [
-      state.datasetId,
-      state.mode,
-      state.page,
-      state.pageSize,
-      state.q,
-      state.sortBy,
-      state.sortDir,
-      state.filterField,
-      state.filterValue,
-      state.visibleColumns.length,
-    ]
-  );
+    }, [state.datasetId, state.mode, state.page, state.pageSize, state.q, state.sortDir, state.visibleColumns.length]);
 
   const refreshAll = useCallback(async () => {
     dispatch({ type: "PATCH", patch: { loading: true, error: null } });
@@ -248,7 +218,10 @@ export function useViewReducer(datasetId: string) {
       await loadRows(chosen);
       dispatch({ type: "PATCH", patch: { loading: false } });
     } catch (e: any) {
-      dispatch({ type: "PATCH", patch: { loading: false, error: e?.message ?? "Failed to load dataset" } });
+      dispatch({
+        type: "PATCH",
+        patch: { loading: false, error: e?.message ?? "Failed to load dataset" },
+      });
     }
   }, [loadMeta, loadBatches, loadRows]);
 
@@ -261,22 +234,11 @@ export function useViewReducer(datasetId: string) {
   useEffect(() => {
     if (!state.datasetId) return;
     loadRows(state.batchId);
-  }, [
-    state.page,
-    state.pageSize,
-    state.q,
-    state.sortBy,
-    state.sortDir,
-    state.filterField,
-    state.filterValue,
-    state.mode,
-    state.batchId,
-    loadRows,
-  ]);
+  }, [state.page, state.pageSize, state.q, state.sortDir, state.mode, state.batchId, loadRows]);
 
   // --- actions (simple) ---
   const updateParams = useCallback(
-    (patch: Partial<Pick<State, "page" | "pageSize" | "q" | "sortBy" | "sortDir" | "filterField" | "filterValue">>) => {
+    (patch: Partial<Pick<ReducerState, "page" | "pageSize" | "q" | "sortDir">>) => {
       dispatch({
         type: "PATCH",
         patch: {
@@ -284,26 +246,23 @@ export function useViewReducer(datasetId: string) {
           // reset expand/cache when params change
           expandedKeys: new Set<string>(),
           childrenCache: {},
-        } as Partial<State>,
+        } as Partial<ReducerState>,
       });
-    },
-    []
-  );
+    }, []);
 
-  const setVisibleColumns = useCallback((columns: string[]) => {
-    dispatch({ type: "PATCH", patch: { visibleColumns: columns } });
-    try { localStorage.setItem(storageKey(state.datasetId), JSON.stringify(columns)); } catch {/* noop */}
-  }, [state.datasetId]);
+  const setVisibleColumns = useCallback(
+    (columns: string[]) => {
+      dispatch({ type: "PATCH", patch: { visibleColumns: columns } });
+      localStorage.setItem(storageKey(state.datasetId), JSON.stringify(columns));
+    }, [state.datasetId]);
 
-  const setBatchId = useCallback((batchId: string | null) => {
-    dispatch({ type: "PATCH", patch: { batchId } });
-  }, []);
+  const setBatchId = useCallback((batchId: string | null) => { dispatch({ type: "PATCH", patch: { batchId } }) }, []);
 
   const toggleRowExpanded = useCallback((key: string) => dispatch({ type: "TOGGLE_EXPANDED", key }), []);
   const clearExpanded = useCallback(() => dispatch({ type: "PATCH", patch: { expandedKeys: new Set(), childrenCache: {} } }), []);
   const setChildrenCache = useCallback((key: string, rows: Row[]) => dispatch({ type: "SET_CHILDREN", key, rows }), []);
 
-  const loadChildrenOnce = useCallback(
+  const loadChildren = useCallback(
     async (groupKey: string) => {
       if (!groupKey || !state.batchId) return [];
       const cached = state.childrenCache[groupKey];
@@ -316,21 +275,6 @@ export function useViewReducer(datasetId: string) {
     [state.datasetId, state.batchId, state.childrenCache]
   );
 
-  const removeDataset = useCallback(
-    async (alsoDeleteSource?: boolean) => {
-      dispatch({ type: "PATCH", patch: { deleting: true, error: null } });
-      try {
-        await deleteDatasetDeep(state.datasetId, { alsoDeleteSource });
-        dispatch({ type: "PATCH", patch: { deleting: false } });
-        return { ok: true };
-      } catch (e: any) {
-        dispatch({ type: "PATCH", patch: { deleting: false, error: e?.message ?? "Delete failed" } });
-        throw e;
-      }
-    },
-    [state.datasetId]
-  );
-
   // derived
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil((state.total || 0) / state.pageSize)),
@@ -339,16 +283,17 @@ export function useViewReducer(datasetId: string) {
 
   return {
     state: { ...state, pageCount },
+    // loaders
     refreshAll,
     loadRows: () => loadRows(state.batchId),
-    loadChildren: loadChildrenOnce,
+    loadChildren,
     loadMeta,
     setBatchId,
+    // actions
     updateParams,
     setVisibleColumns,
     toggleRowExpanded,
     clearExpanded,
     setChildrenCache,
-    removeDataset,
   };
 }

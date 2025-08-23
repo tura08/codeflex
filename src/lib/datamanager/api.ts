@@ -136,10 +136,7 @@ export async function listChildren(
 /* ──────────────────────────────────────────────────────────────
  * Deep delete
  * ────────────────────────────────────────────────────────────── */
-export async function deleteDatasetDeep(
-  datasetId: string,
-  opts?: { alsoDeleteSource?: boolean }
-) {
+export async function deleteDatasetDeep(datasetId: string) {
   // 1) find source
   const { data: ds, error: e0 } = await supabase.from("datasets").select("id, source_id").eq("id", datasetId).single();
   if (e0) throw e0;
@@ -157,10 +154,11 @@ export async function deleteDatasetDeep(
   const { error: e3 } = await supabase.from("datasets").delete().eq("id", datasetId);
   if (e3) throw e3;
 
-  // 5) optionally remove unused source
-  if (opts?.alsoDeleteSource && sourceId) {
+  // 5) ALWAYS try to delete the linked source if unused
+  if (sourceId) {
     const { data: refs, error: e4 } = await supabase.from("datasets").select("id").eq("source_id", sourceId).limit(1);
     if (e4) throw e4;
+
     if (!refs || refs.length === 0) {
       const { error: e5 } = await supabase.from("sheet_sources").delete().eq("id", sourceId);
       if (e5) throw e5;
