@@ -109,11 +109,23 @@ function TablePagination({
  * Main (lean) table — single prop: `view`
  * ────────────────────────────────────────────────────────────── */
 export default function DataTable({ view }: { view: ViewController }) {
-  const { state, updateParams, setVisibleColumns, toggleRowExpanded, loadChildren } = view;
+  const { state, updateParams, setVisibleColumns, toggleRowExpanded, loadChildren, setSort } = view;
 
-  const { loading, mode, rows, page, pageCount, pageSize, visibleColumns, expandedKeys, childrenCache } = state;
+  const {
+    loading,
+    mode,
+    rows,
+    page,
+    pageCount,
+    pageSize,
+    visibleColumns,
+    expandedKeys,
+    childrenCache,
+    sortKey,
+    sortDir,
+  } = state;
+
   const allColumns = rows.length ? Object.keys(rows[0]?.data ?? {}) : [];
-
   const [managerOpen, setManagerOpen] = useState(false);
 
   const handleToggle = async (row: Row) => {
@@ -122,6 +134,37 @@ export default function DataTable({ view }: { view: ViewController }) {
     toggleRowExpanded(key);
     if (!isCurrentlyOpen && mode === "grouped" && !childrenCache[key]) {
       await loadChildren(key);
+    }
+  };
+
+  // V1: header interactions (all optional, won’t break existing behavior)
+  const handleSortToggle = (col: string) => {
+    if (!setSort) return;
+    if (sortKey === col) {
+      const nextDir = sortDir === "asc" ? "desc" : "asc";
+      setSort(col, nextDir);
+    } else {
+      setSort(col, "asc");
+    }
+  };
+
+  const handleHideColumn = (col: string) => {
+    const next = visibleColumns.filter((c) => c !== col);
+    setVisibleColumns(next.length ? next : visibleColumns); // avoid empty table
+  };
+
+  const handleMoveColumn = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...visibleColumns];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x);
+    setVisibleColumns(next);
+  };
+
+  const handleReferencePlaceholder = (col: string) => {
+    // placeholder for the future Reference sheet
+    if (typeof window !== "undefined") {
+      window.alert(`Reference setup for "${col}" — coming soon.`);
     }
   };
 
@@ -165,7 +208,17 @@ export default function DataTable({ view }: { view: ViewController }) {
       {/* Scrollable rows area */}
       <div className="flex-1 overflow-auto rounded-xl border">
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
-          <DataTableHeader mode={mode as Mode} columns={visibleColumns} />
+          <DataTableHeader
+            mode={mode as Mode}
+            columns={visibleColumns}
+            // V1 props — optional, safe if reducer/API aren’t ready
+            sortKey={sortKey ?? null}
+            sortDir={sortDir}
+            onSortToggle={handleSortToggle}
+            onHideColumn={handleHideColumn}
+            onMoveColumn={handleMoveColumn}
+            onOpenReference={handleReferencePlaceholder}
+          />
           <tbody>
             {rows.map((r) => {
               const key = r.group_key ?? String(r.id);

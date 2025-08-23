@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import DataTable from "./DataTable";
 import DeleteDatasetDialog from "./DeleteDatasetDialog";
 
 import { useViewReducer } from "@/pages/DataManager/hooks/useViewReducer";
+import DataTable from "./DataTable";
+// import DataTable from "./DataTableTanstack";
 
 export default function DatasetDetail() {
   const { id: routeId } = useParams();
@@ -50,9 +51,10 @@ export default function DatasetDetail() {
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Card className="h-[68vh] p-3">
-        <DataTable view={view} />
-      </Card>
+        <Card className="h-[68vh] p-3">
+          {/* <DataTable /> */}
+          <DataTable view={view} />
+        </Card>
     </div>
   );
 }

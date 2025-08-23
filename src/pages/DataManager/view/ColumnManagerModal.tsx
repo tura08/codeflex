@@ -8,6 +8,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+/**
+ * Backward compatible ColumnManagerModal:
+ * - Keeps your filter + checkbox selection UX.
+ * - Adds a "Selected (drag to reorder)" panel so you can reorder visible columns.
+ * - Props unchanged.
+ */
 export default function ColumnManagerModal({
   open,
   onOpenChange,
@@ -23,13 +29,15 @@ export default function ColumnManagerModal({
 }) {
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [order, setOrder] = useState<string[]>([]); // ordered list of selected columns
 
-  // hydrate selection each time modal opens or inputs change
+  // hydrate selection/order each time modal opens or inputs change
   useEffect(() => {
     if (!open) return;
     const map: Record<string, boolean> = {};
     all.forEach((c) => (map[c] = initialVisible.includes(c)));
     setSelected(map);
+    setOrder(initialVisible); // start with current order
     setQ("");
   }, [open, all, initialVisible]);
 
@@ -44,38 +52,81 @@ export default function ColumnManagerModal({
     [selected]
   );
 
-  const toggle = (col: string) =>
-    setSelected((s) => ({ ...s, [col]: !s[col] }));
-
-  const selectAllFiltered = () =>
+  const toggle = (col: string) => {
     setSelected((s) => {
-      const next = { ...s };
-      filtered.forEach((c) => (next[c] = true));
+      const next = { ...s, [col]: !s[col] };
+      // keep order in sync
+      setOrder((ord) => {
+        if (next[col] && !ord.includes(col)) return [...ord, col];
+        if (!next[col] && ord.includes(col)) return ord.filter((x) => x !== col);
+        return ord;
+      });
       return next;
     });
+  };
 
-  const clearAllFiltered = () =>
+  const selectAllFiltered = () => {
     setSelected((s) => {
       const next = { ...s };
+      setOrder((ord) => {
+        const added: string[] = [];
+        filtered.forEach((c) => {
+          if (!next[c]) added.push(c);
+          next[c] = true;
+        });
+        // append newly added at the end in the filtered order
+        return [...ord, ...added.filter((c) => !ord.includes(c))];
+      });
+      return next;
+    });
+  };
+
+  const clearAllFiltered = () => {
+    setSelected((s) => {
+      const next = { ...s };
+      setOrder((ord) => ord.filter((c) => !filtered.includes(c)));
       filtered.forEach((c) => (next[c] = false));
       return next;
     });
+  };
+
+  // DnD within "Selected" list
+  const onDragStart = (e: React.DragEvent, idx: number) => {
+    e.dataTransfer.setData("text/plain", String(idx));
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDrop = (e: React.DragEvent, to: number) => {
+    e.preventDefault();
+    const from = Number(e.dataTransfer.getData("text/plain"));
+    if (Number.isNaN(from) || from === to) return;
+    setOrder((ord) => {
+      const onlySelected = ord.filter((c) => selected[c]);
+      const next = [...onlySelected];
+      const [x] = next.splice(from, 1);
+      next.splice(to, 0, x);
+      return next;
+    });
+  };
 
   const handleSave = () => {
-    const nextVisible = all.filter((c) => selected[c]);
-    // at least one visible column
-    onApply(nextVisible.length ? nextVisible : [all[0]].filter(Boolean));
+    // Persist only items that are selected, in the chosen order.
+    const onlySelectedInOrder = order.filter((c) => selected[c]);
+    const fallback = all[0] ? [all[0]] : [];
+    onApply(onlySelectedInOrder.length ? onlySelectedInOrder : fallback);
     onOpenChange(false);
   };
 
+  // computed list for reorder panel: selected columns in current order
+  const selectedOrdered = useMemo(() => order.filter((c) => selected[c]), [order, selected]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Manage columns</DialogTitle>
         </DialogHeader>
 
-        <div className="mt-2 space-y-3">
+        <div className="mt-2 space-y-4">
           <div className="flex items-center justify-between gap-2">
             <Input
               placeholder="Filter columns…"
@@ -97,6 +148,7 @@ export default function ColumnManagerModal({
             </Button>
           </div>
 
+          {/* Selection grid (kept from your original) */}
           <div className="max-h-[40vh] overflow-auto rounded-md border p-2">
             {filtered.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
@@ -120,6 +172,43 @@ export default function ColumnManagerModal({
                 ))}
               </ul>
             )}
+          </div>
+
+          {/* NEW: Reorder panel */}
+          <div>
+            <div className="mb-2 text-xs font-medium">Selected (drag to reorder)</div>
+            <div className="max-h-[32vh] overflow-auto rounded-md border p-2">
+              {selectedOrdered.length === 0 ? (
+                <div className="py-6 text-center text-xs text-muted-foreground">
+                  No selected columns to reorder.
+                </div>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {selectedOrdered.map((c, i) => (
+                    <li
+                      key={c}
+                      className="flex items-center justify-between rounded px-2 py-1 hover:bg-muted/60 cursor-grab"
+                      draggable
+                      onDragStart={(e) => onDragStart(e, i)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => onDrop(e, i)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground select-none">⋮⋮</span>
+                        <span>{c}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggle(c)}
+                      >
+                        Hide
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-1">

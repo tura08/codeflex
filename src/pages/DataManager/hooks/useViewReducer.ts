@@ -1,4 +1,3 @@
-// src/pages/DataManager/hooks/useViewReducer.ts
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -13,7 +12,7 @@ import {
   type Mode,
 } from "@/lib/datamanager/api";
 
-/** Minimal sort model: only direction for now */
+/** Minimal sort model */
 export type SortDir = "asc" | "desc";
 
 type ReducerState = {
@@ -25,6 +24,7 @@ type ReducerState = {
   pageSize: number;
   q: string;
   sortDir: SortDir;
+  sortKey: string | null;
 
   // server selection
   mode: Mode;
@@ -37,6 +37,7 @@ type ReducerState = {
   total: number;
 
   // ui
+  /** also represents column ORDER */
   visibleColumns: string[];
   expandedKeys: Set<string>;
   childrenCache: Record<string, Row[]>;
@@ -62,6 +63,7 @@ const initialState: ReducerState = {
   pageSize: 50,
   q: "",
   sortDir: "asc",
+  sortKey: null,
 
   mode: "flat",
   batchId: null,
@@ -129,14 +131,26 @@ export function useViewReducer(datasetId: string) {
     const page = Number(sp.get("page") || 1);
     const pageSize = Number(sp.get("pp") || 50);
     const q = sp.get("q") || "";
-    const dir = (sp.get("dir") as SortDir) || "asc";
+
+    // sort=field:asc|desc  (fallback legacy ?dir=asc if present)
+    let sortKey: string | null = null;
+    let sortDir: SortDir = "asc";
+    const sortParam = sp.get("sort");
+    if (sortParam) {
+      const [k, d] = sortParam.split(":");
+      sortKey = k || null;
+      sortDir = (d === "desc" ? "desc" : "asc");
+    } else {
+      const legacyDir = sp.get("dir") as SortDir | null;
+      if (legacyDir === "asc" || legacyDir === "desc") sortDir = legacyDir;
+    }
 
     let visibleColumns: string[] = [];
     try {
       const raw = localStorage.getItem(storageKey(datasetId));
       visibleColumns = raw ? (JSON.parse(raw) as string[]) : [];
-    } catch (e) {
-      console.log(e)
+    } catch {
+      /* noop */
     }
 
     dispatch({
@@ -146,7 +160,8 @@ export function useViewReducer(datasetId: string) {
         page,
         pageSize,
         q,
-        sortDir: dir,
+        sortDir,
+        sortKey,
         visibleColumns,
         loading: true,
         error: null,
@@ -162,9 +177,17 @@ export function useViewReducer(datasetId: string) {
     next.set("page", String(state.page));
     next.set("pp", String(state.pageSize));
     state.q ? next.set("q", state.q) : next.delete("q");
-    next.set("dir", state.sortDir);
+
+    if (state.sortKey) {
+      next.set("sort", `${state.sortKey}:${state.sortDir}`);
+      next.delete("dir");
+    } else {
+      next.delete("sort");
+      next.set("dir", state.sortDir); // can be removed later
+    }
+
     setSp(next, { replace: true });
-  }, [state.datasetId, state.page, state.pageSize, state.q, state.sortDir, sp, setSp]);
+  }, [state.datasetId, state.page, state.pageSize, state.q, state.sortKey, state.sortDir, sp, setSp]);
 
   // --- loaders ---
   const loadMeta = useCallback(async () => {
@@ -187,6 +210,7 @@ export function useViewReducer(datasetId: string) {
         dispatch({ type: "SET_ROWS", rows: [], total: 0 });
         return;
       }
+      // NOTE: not passing sortKey to API yet; sorting is client-side per page in DataTable.
       const { data, count } = await listRows({
         datasetId: state.datasetId,
         batchId: effectiveBatchId,
@@ -195,7 +219,7 @@ export function useViewReducer(datasetId: string) {
         pageSize: state.pageSize,
         q: state.q,
         sortDir: state.sortDir,
-      });
+      } as any);
       dispatch({ type: "SET_ROWS", rows: data, total: count });
 
       // default visible cols (first 8)
@@ -208,7 +232,9 @@ export function useViewReducer(datasetId: string) {
           /* noop */
         }
       }
-    }, [state.datasetId, state.mode, state.page, state.pageSize, state.q, state.sortDir, state.visibleColumns.length]);
+    },
+    [state.datasetId, state.mode, state.page, state.pageSize, state.q, state.sortDir, state.visibleColumns.length]
+  );
 
   const refreshAll = useCallback(async () => {
     dispatch({ type: "PATCH", patch: { loading: true, error: null } });
@@ -234,32 +260,52 @@ export function useViewReducer(datasetId: string) {
   useEffect(() => {
     if (!state.datasetId) return;
     loadRows(state.batchId);
-  }, [state.page, state.pageSize, state.q, state.sortDir, state.mode, state.batchId, loadRows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.page, state.pageSize, state.q, state.sortDir, state.mode, state.batchId]);
 
   // --- actions (simple) ---
   const updateParams = useCallback(
-    (patch: Partial<Pick<ReducerState, "page" | "pageSize" | "q" | "sortDir">>) => {
+    (patch: Partial<Pick<ReducerState, "page" | "pageSize" | "q" | "sortDir" | "sortKey">>) => {
+      const resetPage = patch.sortKey !== undefined || patch.sortDir !== undefined ? 1 : patch.page;
       dispatch({
         type: "PATCH",
         patch: {
           ...patch,
+          page: resetPage ?? state.page,
           // reset expand/cache when params change
           expandedKeys: new Set<string>(),
           childrenCache: {},
         } as Partial<ReducerState>,
       });
-    }, []);
+    },
+    [state.page]
+  );
+
+  const setSort = useCallback((key: string | null, dir: SortDir) => {
+    updateParams({ sortKey: key, sortDir: dir, page: 1 });
+  }, [updateParams]);
 
   const setVisibleColumns = useCallback(
     (columns: string[]) => {
       dispatch({ type: "PATCH", patch: { visibleColumns: columns } });
-      localStorage.setItem(storageKey(state.datasetId), JSON.stringify(columns));
-    }, [state.datasetId]);
+      try {
+        localStorage.setItem(storageKey(state.datasetId), JSON.stringify(columns));
+      } catch {
+        /* noop */
+      }
+    },
+    [state.datasetId]
+  );
 
-  const setBatchId = useCallback((batchId: string | null) => { dispatch({ type: "PATCH", patch: { batchId } }) }, []);
+  const setBatchId = useCallback((batchId: string | null) => {
+    dispatch({ type: "PATCH", patch: { batchId } });
+  }, []);
 
   const toggleRowExpanded = useCallback((key: string) => dispatch({ type: "TOGGLE_EXPANDED", key }), []);
-  const clearExpanded = useCallback(() => dispatch({ type: "PATCH", patch: { expandedKeys: new Set(), childrenCache: {} } }), []);
+  const clearExpanded = useCallback(
+    () => dispatch({ type: "PATCH", patch: { expandedKeys: new Set(), childrenCache: {} } }),
+    []
+  );
   const setChildrenCache = useCallback((key: string, rows: Row[]) => dispatch({ type: "SET_CHILDREN", key, rows }), []);
 
   const loadChildren = useCallback(
@@ -295,5 +341,6 @@ export function useViewReducer(datasetId: string) {
     toggleRowExpanded,
     clearExpanded,
     setChildrenCache,
+    setSort,
   };
 }

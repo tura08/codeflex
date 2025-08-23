@@ -1,11 +1,62 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /** Exported types so other files can import them */
 export type Mode = "grouped" | "flat";
 export type Row = { id: string; role: string; group_key?: string; data: Record<string, any> };
 
-export function DataTableHeader({ mode, columns }: { mode: Mode; columns: string[] }) {
+/**
+ * DataTableHeader
+ * - Backward compatible: works fine if you only pass { mode, columns }.
+ * - Optional props enable V1 features (sort, hide, reference, drag-reorder).
+ */
+export function DataTableHeader(props: {
+  mode: Mode;
+  columns: string[];
+  // V1 (optional)
+  sortKey?: string | null;
+  sortDir?: "asc" | "desc";
+  onSortToggle?: (col: string) => void;
+  onHideColumn?: (col: string) => void;
+  onMoveColumn?: (from: number, to: number) => void; // header DnD
+  onOpenReference?: (col: string) => void;
+}) {
+  const {
+    mode,
+    columns,
+    sortKey = null,
+    sortDir = "asc",
+    onSortToggle,
+    onHideColumn,
+    onMoveColumn,
+    onOpenReference,
+  } = props;
+
+  // Minimal, dependency-free header DnD
+  const onDragStart = (e: React.DragEvent, from: number) => {
+    if (!onMoveColumn) return;
+    e.dataTransfer.setData("text/plain", String(from));
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDrop = (e: React.DragEvent, to: number) => {
+    if (!onMoveColumn) return;
+    e.preventDefault();
+    const raw = e.dataTransfer.getData("text/plain");
+    const from = Number(raw);
+    if (!Number.isNaN(from) && from !== to) onMoveColumn(from, to);
+  };
+
+  const sortGlyph = (col: string) => {
+    if (!sortKey || sortKey !== col) return null;
+    return <span className="ml-1 select-none">{sortDir === "asc" ? "▲" : "▼"}</span>;
+  };
+
   return (
     <thead className="sticky top-0 z-10 bg-muted">
       <tr>
@@ -14,11 +65,63 @@ export function DataTableHeader({ mode, columns }: { mode: Mode; columns: string
         {mode === "grouped" && (
           <th className="w-[160px] bg-muted p-2 text-left align-middle">group_key</th>
         )}
-        {columns.map((k) => (
-          <th key={k} className="bg-muted p-2 text-left align-middle">
-            {k}
+
+        {columns.map((k, idx) => (
+          <th
+            key={k}
+            className="bg-muted p-2 text-left align-middle"
+            draggable={!!onMoveColumn}
+            onDragStart={(e) => onDragStart(e, idx)}
+            onDragOver={(e) => onMoveColumn ? e.preventDefault() : undefined}
+            onDrop={(e) => onDrop(e, idx)}
+          >
+            <div className="flex items-center gap-2">
+              {onMoveColumn && <span className="cursor-grab select-none text-muted-foreground">⋮⋮</span>}
+
+              {onSortToggle ? (
+                <button
+                  type="button"
+                  className="leading-none hover:underline"
+                  title="Sort"
+                  onClick={() => onSortToggle(k)}
+                >
+                  {k}
+                  {sortGlyph(k)}
+                </button>
+              ) : (
+                <span>{k}</span>
+              )}
+
+              {(onHideColumn || onOpenReference) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      ⋮
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-[180px]">
+                    {onSortToggle && (
+                      <DropdownMenuItem onClick={() => onSortToggle(k)}>
+                        Sort (toggle)
+                      </DropdownMenuItem>
+                    )}
+                    {onHideColumn && (
+                      <DropdownMenuItem onClick={() => onHideColumn(k)}>
+                        Hide column
+                      </DropdownMenuItem>
+                    )}
+                    {onOpenReference && (
+                      <DropdownMenuItem onClick={() => onOpenReference(k)}>
+                        Reference…
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </th>
         ))}
+
         <th className="w-[90px] bg-muted p-2 text-left align-middle">JSON</th>
       </tr>
     </thead>
