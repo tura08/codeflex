@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 // import { Dialog, DialogContent } from "@/components/ui/dialog";
 // import { Maximize2, X } from "lucide-react";
 import { useImport } from "../context/ImportContext";
-import { useValidation } from "../hooks/useValidation";
+import { useImportValidation } from "../hooks/useImportValidation";
 import type { Issue } from "@/lib/google/validate";
 
 /* ────────────────── helpers ────────────────── */
@@ -186,7 +186,7 @@ export default function PreviewPanel() {
   } = useImport();
 
   const { headers, rows, selectedRowIdx } = state;
-  const { issues, stats, errorRowIndices, warningRowIndices } = useValidation();
+  const { issues, stats, errorRowIndices, warningRowIndices } = useImportValidation();
 
   // const [fullscreen, setFullscreen] = useState(false);
 

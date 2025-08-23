@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useAllColumns } from "./TableHelpers";
 
 /** Exported types so other files can import them */
 export type Mode = "grouped" | "flat";
@@ -44,7 +43,12 @@ export function DataTableRow({
   formatCell: (v: any) => string;
 }) {
   const [showJson, setShowJson] = useState(false);
-  const childColumns = useAllColumns(childrenRows);
+
+  // child columns computed locally (only used here)
+  const childColumns = useMemo(
+    () => Object.keys(childrenRows?.[0]?.data ?? {}),
+    [childrenRows]
+  );
 
   const colSpan =
     (mode === "grouped" ? 1 : 0) + // expand

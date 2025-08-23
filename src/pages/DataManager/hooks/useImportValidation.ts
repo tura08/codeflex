@@ -1,9 +1,9 @@
-// src/pages/DataManager/import/useValidation.ts
+// src/pages/DataManager/import/useImportValidation.ts
 import { useMemo } from "react";
 import { validate, qualityFromIssues, type Issue } from "@/lib/google/validate";
 import { useImport } from "../context/ImportContext";
 
-export function useValidation() {
+export function useImportValidation() {
   const { state } = useImport();
   const { rows, headers, mapping } = state;
 

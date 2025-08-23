@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import type { SimpleType } from "@/lib/google/infer";
 import { useImport } from "../context/ImportContext";
-import { useValidation } from "../hooks/useValidation";
+import { useImportValidation } from "../hooks/useImportValidation";
 import type { Issue } from "@/lib/google/validate";
 
 export default function MappingEditor() {
   const { state, setMapping, setDatasetName } = useImport();
   const { headers, mapping, datasetName } = state;
-  const { issues } = useValidation();
+  const { issues } = useImportValidation();
 
   // issues per header
   const countsByHeader = useMemo(() => {
