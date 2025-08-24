@@ -77,22 +77,15 @@ export async function getLatestBatchId(datasetId: string): Promise<string | null
 /* ──────────────────────────────────────────────────────────────
  * Rows (paged)
  * ────────────────────────────────────────────────────────────── */
-type ListRowsArgs = {
+
+export async function listRows(args: {
   datasetId: string;
-  batchId: string;
-  mode: Mode;
+  mode: "grouped" | "flat";
   page: number;
   pageSize: number;
   q?: string;
-  // placeholders for future server sorting/filtering
-  sortBy?: string | null;
-  sortDir?: "asc" | "desc" | null;
-  filterField?: string | null;
-  filterValue?: string | null;
-};
-
-export async function listRows(args: ListRowsArgs): Promise<{ data: Row[]; count: number }> {
-  const { datasetId, batchId, mode, page, pageSize, q } = args;
+}): Promise<{ data: Row[]; count: number }> {
+  const { datasetId, mode, page, pageSize, q } = args;
   const table = mode === "grouped" ? "v_dataset_parents" : "v_dataset_flat";
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -101,11 +94,9 @@ export async function listRows(args: ListRowsArgs): Promise<{ data: Row[]; count
     .from(table)
     .select("id,data,role,group_key,import_batch_id", { count: "exact" })
     .eq("dataset_id", datasetId)
-    .eq("import_batch_id", batchId)
     .range(from, to)
     .order("id", { ascending: true });
 
-  // Full-text-ish search on precomputed text column
   if (q && q.trim()) qy = qy.ilike("data_text", `%${q}%`);
 
   const { data, count, error } = await qy;
@@ -113,19 +104,20 @@ export async function listRows(args: ListRowsArgs): Promise<{ data: Row[]; count
   return { data: (data ?? []) as Row[], count: count ?? 0 };
 }
 
+
 /* ──────────────────────────────────────────────────────────────
  * Children by group_key
  * ────────────────────────────────────────────────────────────── */
 export async function listChildren(
-  datasetId: string,
-  batchId: string,
-  groupKey: string
+  datasetId: string | null,
+  groupKey: string | null
 ): Promise<Row[]> {
+  if (!datasetId || !groupKey) return [];
+
   const { data, error } = await supabase
     .from("v_dataset_children")
     .select("id,data,role,group_key,import_batch_id")
     .eq("dataset_id", datasetId)
-    .eq("import_batch_id", batchId)
     .eq("group_key", groupKey)
     .order("id", { ascending: true });
 
