@@ -1,10 +1,10 @@
 import { useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import DeleteDatasetDialog from "./DeleteDatasetDialog";
 
 import { useViewReducer } from "@/pages/DataManager/hooks/useViewReducer";
 import DataTable from "./DataTable";
 import { ViewControllerProvider } from "@/pages/DataManager/context/ViewContext"; // <-- context
+import DatasetSettings from "./DatasetSettings";
 
 export default function DatasetDetail() {
   const { id: routeId } = useParams();
@@ -31,7 +31,7 @@ export default function DatasetDetail() {
             </div>
           </div>
 
-          <DeleteDatasetDialog datasetId={id} datasetName={dataset?.name} />
+          <DatasetSettings />
         </div>
 
         {error && <p className="text-destructive text-sm">{error}</p>}
