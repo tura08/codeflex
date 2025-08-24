@@ -2,8 +2,6 @@ import * as React from "react";
 import TableKit from "./table/TableKit";
 import type { ColumnDefLike } from "./table/types";
 import { formatCell } from "./table/utils";
-
-import type { useViewReducer } from "@/pages/DataManager/hooks/useViewReducer";
 import type { Row } from "./table/types";
 
 import {
@@ -15,37 +13,26 @@ import {
 } from "./table/ColumnsActions";
 import { useColumnsDnD } from "./table/ColumnsDnD";
 import { DataTableChildren } from "./table/TableChildren";
+import { useViewController } from "@/pages/DataManager/context/ViewContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
-type ViewController = ReturnType<typeof useViewReducer>;
-
-export default function DataTableV2({ view }: { view: ViewController }) {
+export default function DataTable() {
+  const view = useViewController();
   const { state, updateParams, setVisibleColumns, toggleRowExpanded, loadChildren } = view;
-  const {
-    mode,
-    rows,
-    page,
-    pageSize,
-    pageCount,
-    q,
-    visibleColumns,
-    loading,
-    expandedKeys,
-    childrenCache,
-  } = state;
+  const { mode, rows, page, pageSize, pageCount, q, visibleColumns, loading, expandedKeys, childrenCache } = state;
 
   const allColumns = React.useMemo(
     () => (rows.length ? Object.keys(rows[0]?.data ?? {}) : []),
     [rows]
   );
 
-  // Data columns with DnD headers
   const dataCols = useColumnsDnD<Row>(visibleColumns, (next) => setVisibleColumns(next));
 
-  // Expansion helpers
-  const isOpen = React.useCallback(
-    (key: string) => expandedKeys.has(key),
-    [expandedKeys]
-  );
+  // ✅ stable right columns & builder
+  const rightCols = React.useMemo(() => [jsonColumn(), actionsColumn()], []);
+  const buildCols = React.useCallback(() => dataCols, [dataCols]);
+
+  const isOpen = React.useCallback((key: string) => expandedKeys.has(key), [expandedKeys]);
 
   const onToggle = React.useCallback(
     async (key: string) => {
@@ -88,13 +75,11 @@ export default function DataTableV2({ view }: { view: ViewController }) {
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex-1 overflow-auto rounded-xl border bg-background">
-          <div className="p-3 space-y-2">
-            <div className="h-6 w-full animate-pulse rounded bg-muted/50" />
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-5 w-full animate-pulse rounded bg-muted/30" />
-            ))}
-          </div>
+        <div className="flex-1 overflow-auto rounded-xl border bg-background p-3 space-y-2">
+          <Skeleton className="h-6 w-full" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-5 w-full" />
+          ))}
         </div>
       </div>
     );
@@ -106,16 +91,14 @@ export default function DataTableV2({ view }: { view: ViewController }) {
       idForRow={(r) => String(r.id)}
       allDataColumns={allColumns}
       visibleColumns={visibleColumns}
-      buildDataColumns={() => dataCols}
+      buildDataColumns={buildCols}
       staticLeftColumns={leftCols}
-      staticRightColumns={[jsonColumn(), actionsColumn()]}
-
+      staticRightColumns={rightCols}
       page={page}
       pageSize={pageSize}
       pageCount={pageCount}
       q={q}
       onSearch={(next) => updateParams({ q: next, page: 1 })}
-
       renderAfterRow={renderAfterRow}
       onPageChange={(p) => updateParams({ page: p })}
       onPageSizeChange={(s) => updateParams({ pageSize: s, page: 1 })}

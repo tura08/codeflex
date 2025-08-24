@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   getDatasetMeta,
@@ -37,7 +37,6 @@ type ReducerState = {
   total: number;
 
   // ui
-  /** also represents column ORDER */
   visibleColumns: string[];
   expandedKeys: Set<string>;
   childrenCache: Record<string, Row[]>;
@@ -85,77 +84,65 @@ function storageKey(datasetId: string) {
   return `dm:cols:${datasetId}`;
 }
 
-/* ──────────────────────────────────────────────────────────────
- * Reducer
- * ────────────────────────────────────────────────────────────── */
 function reducer(state: ReducerState, action: Action): ReducerState {
   switch (action.type) {
     case "INIT":
       return { ...state, ...action.payload };
-
     case "PATCH":
       return { ...state, ...action.patch };
-
     case "SET_META":
       return { ...state, dataset: action.dataset, mode: action.mode };
-
     case "SET_BATCHES":
       return { ...state, batches: action.batches, batchId: action.batchId };
-
     case "SET_ROWS":
       return { ...state, rows: action.rows, total: action.total };
-
     case "TOGGLE_EXPANDED": {
       const next = new Set(state.expandedKeys);
       next.has(action.key) ? next.delete(action.key) : next.add(action.key);
       return { ...state, expandedKeys: next };
     }
-
     case "SET_CHILDREN":
       return { ...state, childrenCache: { ...state.childrenCache, [action.key]: action.rows } };
-
     default:
       return state;
   }
 }
 
-/* ──────────────────────────────────────────────────────────────
- * Hook
- * ────────────────────────────────────────────────────────────── */
+/* ----------------------------------------------
+ * Hook — single-effect, lazy init
+ * ---------------------------------------------- */
 export function useViewReducer(datasetId: string) {
   const [sp, setSp] = useSearchParams();
-  const [state, dispatch] = useReducer(reducer, initialState);
 
-  // --- bootstrap from URL + LS ---
-  useEffect(() => {
-    const page = Number(sp.get("page") || 1);
-    const pageSize = Number(sp.get("pp") || 50);
-    const q = sp.get("q") || "";
+  // Lazy init reads URL + localStorage once. No bootstrap effect.
+  const [state, dispatch] = useReducer(
+    reducer,
+    { datasetId, sp } as { datasetId: string; sp: URLSearchParams },
+    (arg) => {
+      const page = Number(arg.sp.get("page") || 1);
+      const pageSize = Number(arg.sp.get("pp") || 50);
+      const q = arg.sp.get("q") || "";
 
-    // sort=field:asc|desc  (fallback legacy ?dir=asc if present)
-    let sortKey: string | null = null;
-    let sortDir: SortDir = "asc";
-    const sortParam = sp.get("sort");
-    if (sortParam) {
-      const [k, d] = sortParam.split(":");
-      sortKey = k || null;
-      sortDir = (d === "desc" ? "desc" : "asc");
-    } else {
-      const legacyDir = sp.get("dir") as SortDir | null;
-      if (legacyDir === "asc" || legacyDir === "desc") sortDir = legacyDir;
-    }
+      let sortKey: string | null = null;
+      let sortDir: SortDir = "asc";
+      const sortParam = arg.sp.get("sort");
+      if (sortParam) {
+        const [k, d] = sortParam.split(":");
+        sortKey = k || null;
+        sortDir = d === "desc" ? "desc" : "asc";
+      } else {
+        const legacyDir = arg.sp.get("dir") as SortDir | null;
+        if (legacyDir === "asc" || legacyDir === "desc") sortDir = legacyDir;
+      }
 
-    let visibleColumns: string[] = [];
-    try {
-      const raw = localStorage.getItem(storageKey(datasetId));
-      visibleColumns = raw ? (JSON.parse(raw) as string[]) : [];
-    } catch {
-      /* noop */
-    }
+      let visibleColumns: string[] = [];
+      try {
+        const raw = localStorage.getItem(storageKey(datasetId));
+        visibleColumns = raw ? (JSON.parse(raw) as string[]) : [];
+      } catch {}
 
-    dispatch({
-      type: "INIT",
-      payload: {
+      return {
+        ...initialState,
         datasetId,
         page,
         pageSize,
@@ -164,135 +151,152 @@ export function useViewReducer(datasetId: string) {
         sortKey,
         visibleColumns,
         loading: true,
-        error: null,
-      },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId]);
-
-  // --- keep URL in sync ---
-  useEffect(() => {
-    if (!state.datasetId) return;
-    const next = new URLSearchParams(sp);
-    next.set("page", String(state.page));
-    next.set("pp", String(state.pageSize));
-    state.q ? next.set("q", state.q) : next.delete("q");
-
-    if (state.sortKey) {
-      next.set("sort", `${state.sortKey}:${state.sortDir}`);
-      next.delete("dir");
-    } else {
-      next.delete("sort");
-      next.set("dir", state.sortDir); // can be removed later
+      };
     }
-
-    setSp(next, { replace: true });
-  }, [state.datasetId, state.page, state.pageSize, state.q, state.sortKey, state.sortDir, sp, setSp]);
-
-  // --- loaders ---
-  const loadMeta = useCallback(async () => {
-    const meta = await getDatasetMeta(state.datasetId);
-    const mode: Mode = meta.grouping_enabled ? "grouped" : "flat";
-    dispatch({ type: "SET_META", dataset: meta, mode });
-  }, [state.datasetId]);
-
-  const loadBatches = useCallback(async () => {
-    const stamps = await listBatchStamps(state.datasetId);
-    const batches = computeBatches(stamps);
-    const chosen = state.batchId ?? batches[0]?.id ?? null;
-    dispatch({ type: "SET_BATCHES", batches, batchId: chosen });
-    return chosen;
-  }, [state.datasetId, state.batchId]);
-
-  const loadRows = useCallback(
-    async (effectiveBatchId: string | null) => {
-      if (!effectiveBatchId) {
-        dispatch({ type: "SET_ROWS", rows: [], total: 0 });
-        return;
-      }
-      // NOTE: not passing sortKey to API yet; sorting is client-side per page in DataTable.
-      const { data, count } = await listRows({
-        datasetId: state.datasetId,
-        batchId: effectiveBatchId,
-        mode: state.mode,
-        page: state.page,
-        pageSize: state.pageSize,
-        q: state.q,
-        sortDir: state.sortDir,
-      } as any);
-      dispatch({ type: "SET_ROWS", rows: data, total: count });
-
-      // default visible cols (first 8)
-      if (!state.visibleColumns.length && data.length) {
-        const first = Object.keys(data[0]?.data ?? {}).slice(0, 8);
-        dispatch({ type: "PATCH", patch: { visibleColumns: first } });
-        try {
-          localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first));
-        } catch {
-          /* noop */
-        }
-      }
-    },
-    [state.datasetId, state.mode, state.page, state.pageSize, state.q, state.sortDir, state.visibleColumns.length]
   );
 
-  const refreshAll = useCallback(async () => {
-    dispatch({ type: "PATCH", patch: { loading: true, error: null } });
-    try {
-      await loadMeta();
-      const chosen = await loadBatches();
-      await loadRows(chosen);
-      dispatch({ type: "PATCH", patch: { loading: false } });
-    } catch (e: any) {
-      dispatch({
-        type: "PATCH",
-        patch: { loading: false, error: e?.message ?? "Failed to load dataset" },
-      });
-    }
-  }, [loadMeta, loadBatches, loadRows]);
+  // Track previous datasetId (to know when to also fetch meta/batches)
+  const prevDatasetIdRef = useRef<string | null>(null);
 
-  // initial + param-driven
+  /**
+   * ONE EFFECT:
+   * - If dataset changed: load meta + batches, pick latest batch
+   * - Then (or if dataset didn't change): load rows with current params
+   */
   useEffect(() => {
-    if (!state.datasetId) return;
-    refreshAll();
-  }, [state.datasetId, refreshAll]);
+    let active = true;
 
-  useEffect(() => {
-    if (!state.datasetId) return;
-    loadRows(state.batchId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.page, state.pageSize, state.q, state.sortDir, state.mode, state.batchId]);
+    (async () => {
+      if (!state.datasetId) return;
 
-  // --- actions (simple) ---
+      dispatch({ type: "PATCH", patch: { loading: true, error: null } });
+
+      try {
+        const datasetChanged = prevDatasetIdRef.current !== state.datasetId;
+        let effectiveBatchId = state.batchId;
+
+        if (datasetChanged) {
+          const meta = await getDatasetMeta(state.datasetId);
+          if (!active) return;
+          const mode: Mode = meta.grouping_enabled ? "grouped" : "flat";
+          dispatch({ type: "SET_META", dataset: meta, mode });
+
+          const stamps = await listBatchStamps(state.datasetId);
+          if (!active) return;
+          const batches = computeBatches(stamps);
+          effectiveBatchId = batches[0]?.id ?? null;
+          dispatch({ type: "SET_BATCHES", batches, batchId: effectiveBatchId });
+        }
+
+        if (effectiveBatchId) {
+          const { data, count } = await listRows({
+            datasetId: state.datasetId,
+            batchId: effectiveBatchId,
+            mode: state.mode,
+            page: state.page,
+            pageSize: state.pageSize,
+            q: state.q,
+            sortDir: state.sortDir,
+          } as any);
+
+          if (!active) return;
+
+          dispatch({ type: "SET_ROWS", rows: data, total: count });
+
+          // Seed visible columns once
+          if (!state.visibleColumns.length && data.length) {
+            const first = Object.keys(data[0]?.data ?? {}).slice(0, 8);
+            dispatch({ type: "PATCH", patch: { visibleColumns: first } });
+            try {
+              localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first));
+            } catch {}
+          }
+        } else {
+          // dataset with no batches/rows
+          dispatch({ type: "SET_ROWS", rows: [], total: 0 });
+        }
+      } catch (e: any) {
+        if (!active) return;
+        dispatch({ type: "PATCH", patch: { error: e?.message ?? "Failed to load dataset" } });
+      } finally {
+        if (active) dispatch({ type: "PATCH", patch: { loading: false } });
+        prevDatasetIdRef.current = state.datasetId;
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    state.datasetId, // detect dataset change
+    state.batchId,   // if user changes it later
+    state.mode,
+    state.page,
+    state.pageSize,
+    state.q,
+    state.sortDir,
+    state.sortKey,   // reserved (server sortKey later)
+    // NOTE: we intentionally do NOT include visibleColumns.length to avoid loops
+  ]);
+
+  /* ----------------------------------------------
+   * Actions
+   * ---------------------------------------------- */
   const updateParams = useCallback(
     (patch: Partial<Pick<ReducerState, "page" | "pageSize" | "q" | "sortDir" | "sortKey">>) => {
-      const resetPage = patch.sortKey !== undefined || patch.sortDir !== undefined ? 1 : patch.page;
+      // compute next values (single source of truth)
+      const nextPage =
+        patch.sortKey !== undefined || patch.sortDir !== undefined
+          ? 1
+          : patch.page ?? state.page;
+
+      const nextPageSize = patch.pageSize ?? state.pageSize;
+      const nextQ = patch.q ?? state.q;
+      const nextSortKey = patch.sortKey ?? state.sortKey;
+      const nextSortDir = patch.sortDir ?? state.sortDir;
+
+      // reducer update
       dispatch({
         type: "PATCH",
         patch: {
-          ...patch,
-          page: resetPage ?? state.page,
-          // reset expand/cache when params change
+          page: nextPage,
+          pageSize: nextPageSize,
+          q: nextQ,
+          sortKey: nextSortKey,
+          sortDir: nextSortDir,
           expandedKeys: new Set<string>(),
           childrenCache: {},
-        } as Partial<ReducerState>,
+        },
       });
+
+      // Update URL right here (idempotent)
+      const next = new URLSearchParams(sp);
+      next.set("page", String(nextPage));
+      next.set("pp", String(nextPageSize));
+      nextQ ? next.set("q", nextQ) : next.delete("q");
+      if (nextSortKey) {
+        next.set("sort", `${nextSortKey}:${nextSortDir}`);
+        next.delete("dir");
+      } else {
+        next.delete("sort");
+        next.set("dir", nextSortDir);
+      }
+      if (next.toString() !== sp.toString()) setSp(next, { replace: true });
     },
-    [state.page]
+    [sp, setSp, state.page, state.pageSize, state.q, state.sortKey, state.sortDir]
   );
 
-  const setSort = useCallback((key: string | null, dir: SortDir) => {
-    updateParams({ sortKey: key, sortDir: dir, page: 1 });
-  }, [updateParams]);
+  const setSort = useCallback(
+    (key: string | null, dir: SortDir) => updateParams({ sortKey: key, sortDir: dir, page: 1 }),
+    [updateParams]
+  );
 
   const setVisibleColumns = useCallback(
     (columns: string[]) => {
       dispatch({ type: "PATCH", patch: { visibleColumns: columns } });
       try {
         localStorage.setItem(storageKey(state.datasetId), JSON.stringify(columns));
-      } catch {
-        /* noop */
-      }
+      } catch {}
     },
     [state.datasetId]
   );
@@ -301,12 +305,20 @@ export function useViewReducer(datasetId: string) {
     dispatch({ type: "PATCH", patch: { batchId } });
   }, []);
 
-  const toggleRowExpanded = useCallback((key: string) => dispatch({ type: "TOGGLE_EXPANDED", key }), []);
+  const toggleRowExpanded = useCallback(
+    (key: string) => dispatch({ type: "TOGGLE_EXPANDED", key }),
+    []
+  );
+
   const clearExpanded = useCallback(
     () => dispatch({ type: "PATCH", patch: { expandedKeys: new Set(), childrenCache: {} } }),
     []
   );
-  const setChildrenCache = useCallback((key: string, rows: Row[]) => dispatch({ type: "SET_CHILDREN", key, rows }), []);
+
+  const setChildrenCache = useCallback(
+    (key: string, rows: Row[]) => dispatch({ type: "SET_CHILDREN", key, rows }),
+    []
+  );
 
   const loadChildren = useCallback(
     async (groupKey: string) => {
@@ -329,11 +341,11 @@ export function useViewReducer(datasetId: string) {
 
   return {
     state: { ...state, pageCount },
-    // loaders
-    refreshAll,
-    loadRows: () => loadRows(state.batchId),
+    // loaders (kept for API compatibility; table doesn't need them directly)
+    refreshAll: () => {},
+    loadRows: () => {},
     loadChildren,
-    loadMeta,
+    loadMeta: () => {},
     setBatchId,
     // actions
     updateParams,

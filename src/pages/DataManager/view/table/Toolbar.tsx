@@ -1,14 +1,13 @@
-import * as React from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Columns3 } from "lucide-react";
 import { useTableContext } from "./TableContext";
 
 /**
- * Generic, reusable table toolbar.
- * - Center: search input (controlled via `q`/`onSearch`)
- * - Right: "Manage columns" with Columns icon (from TableContext)
- * - Left/Right slots allow dataset-specific controls (batch selector, chips, etc.)
+ * Table toolbar:
+ * - LEFT: Search (commit on Enter / blur) + optional leftSlot
+ * - RIGHT: optional rightSlot + Manage Columns
  */
 export function Toolbar({
   q,
@@ -16,34 +15,55 @@ export function Toolbar({
   leftSlot,
   rightSlot,
 }: {
-  q?: string | null; // allow null/undefined
+  q?: string | null;
   onSearch: (next: string) => void;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
 }) {
   const { openColumnManager } = useTableContext();
 
-  // Controlled input that reflects reducer `q`
-  const [val, setVal] = React.useState<string>(q ?? "");
-  React.useEffect(() => {
-    setVal(q ?? "");
-  }, [q]);
+  const [val, setVal] = useState<string>(q ?? "");
+  const [focused, setFocused] = useState(false);
+  const enterCommittedRef = useRef(false); // prevent Enter → blur double commit
+
+  // Only sync external q when NOT focused (don’t clobber typing)
+  useEffect(() => {
+    if (!focused) setVal(q ?? "");
+  }, [q, focused]);
 
   return (
-    <div className="flex items-center justify-between">
-      {/* Left area (optional) */}
-
+    <div className="flex items-center justify-between gap-2">
+      {/* LEFT group: Search + leftSlot */}
       <div className="flex items-center gap-2">
         <Input
           placeholder="Search…"
           className="h-8 w-64"
-          />
+          value={val}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            if (enterCommittedRef.current) {
+              enterCommittedRef.current = false;
+              return; // avoid double commit
+            }
+            onSearch(val);
+          }}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              enterCommittedRef.current = true;
+              onSearch(val);
+            }
+            if (e.key === "Escape") {
+              setVal("");
+              onSearch("");
+            }
+          }}
+        />
+        {leftSlot}
       </div>
 
-      {/* Center: search */}
-      <div className="flex items-center gap-2">{leftSlot}</div>
-
-      {/* Right: manage columns + optional rightSlot */}
+      {/* RIGHT group: rightSlot + manage columns */}
       <div className="flex items-center gap-2">
         {rightSlot}
         <Button variant="outline" size="sm" onClick={openColumnManager}>

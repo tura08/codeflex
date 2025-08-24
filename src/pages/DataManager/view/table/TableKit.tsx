@@ -62,7 +62,6 @@ export default function TableKit<T>(
 
   return (
     <TableProvider value={{ openColumnManager: () => setModalOpen(true) }}>
-      {/* Single, reusable toolbar */}
       <Toolbar
         q={q}
         onSearch={onSearch}
