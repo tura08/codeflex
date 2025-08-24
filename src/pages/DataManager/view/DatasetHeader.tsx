@@ -1,7 +1,7 @@
 // src/pages/DataManager/DatasetHeader.tsx
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { Batch } from "../hooks/useDatasetBrowser";
+import type { Batch } from "@/lib/datamanager/api";
 
 type Props = {
   groupingEnabled: boolean;

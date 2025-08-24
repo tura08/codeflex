@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import ColumnManagerModal from "./ColumnManagerModal";
+import ColumnManagerModal from "./table/ColumnManagerModal";
 import { DataTableHeader, DataTableRow, type Mode, type Row } from "./DataTableParts";
 import type { useViewReducer } from "@/pages/DataManager/hooks/useViewReducer";
 
