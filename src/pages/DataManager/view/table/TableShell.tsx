@@ -30,7 +30,6 @@ export function TableShell<T>({
   const leafColCount = table.getAllLeafColumns().length;
 
   return (
-    // This is the vertical scroll container
     <div className="h-full overflow-auto rounded-xl border">
       <table className="w-full caption-bottom text-sm">
         <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-b">

@@ -7,7 +7,6 @@ import DeleteDatasetDialog from "./DeleteDatasetDialog";
 
 import { useViewReducer } from "@/pages/DataManager/hooks/useViewReducer";
 import DataTable from "./DataTable";
-import DataTableV2 from "./DataTableV2";
 
 export default function DatasetDetail() {
   const { id: routeId } = useParams();
@@ -26,40 +25,39 @@ export default function DatasetDetail() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">{dataset?.name ?? "Dataset"}</h1>
-          <p className="text-xs text-muted-foreground">
-            {mode === "grouped"
-              ? "Grouped view (parents with inline children preview)"
-              : "Flat view"}
-          </p>
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              {mode === "grouped"
+                ? "Grouped view (parents with inline children preview)"
+                : "Flat view"}
+            </span>
+            <span>•</span>
+            <span>Rows: {loading ? "…" : total}</span>
+          </div>
         </div>
 
         <DeleteDatasetDialog datasetId={id} datasetName={dataset?.name} />
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search…"
-            className="h-8 w-64"
-            value={searchInput}
-            onChange={(e) => {
-              const val = e.target.value;
-              setSearchInput(val);
-              updateParams({ q: val, page: 1 });
-            }}
-          />
-          <span className="text-xs text-muted-foreground">
-            Rows: {loading ? "…" : total}
-          </span>
-        </div>
+        <Input
+          placeholder="Search…"
+          className="h-8 w-64"
+          value={searchInput}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSearchInput(val);
+            updateParams({ q: val, page: 1 });
+          }}
+        />
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Card className="h-[76vh] p-3">
-        <DataTableV2 view={view} />
-        {/* <DataTable view={view} /> */}
+      <Card className="h-[62vh] p-3">
+        <DataTable view={view} />
       </Card>
     </div>
   );
 }
+

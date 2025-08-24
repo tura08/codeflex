@@ -1,17 +1,20 @@
-// src/pages/DataManager/view/table/TableKit.tsx
-import * as React from "react";
+import { type ReactNode, useState, useMemo } from "react";
 import type { TableKitProps } from "./types";
+
 import { useTanstackTable } from "./adapters/tanstackAdapter";
 import { ensureAtLeastOne } from "./utils";
 import { TableShell } from "./TableShell";
 import { TableProvider } from "./TableContext";
 import ColumnManagerModal from "./ColumnManagerModal";
-import { TableHeader } from "./TableHeader";
 import { Pagination } from "./Pagination";
+import { Toolbar } from "./Toolbar";
 
 export default function TableKit<T>(
   props: TableKitProps<T> & {
-    renderAfterRow?: (row: any, leafColCount: number) => React.ReactNode;
+    renderAfterRow?: (row: any, leafColCount: number) => ReactNode;
+    toolbarLeftSlot?: ReactNode;
+    toolbarRightSlot?: ReactNode;
+    q?: string | null;
   }
 ) {
   const {
@@ -31,15 +34,16 @@ export default function TableKit<T>(
     onPageSizeChange,
     onVisibleColumnsChange,
     renderAfterRow,
+    toolbarLeftSlot,
+    toolbarRightSlot,
   } = props;
 
-  const [rowSelection, setRowSelection] =
-    React.useState<Record<string, boolean>>({});
-  const [modalOpen, setModalOpen] = React.useState(false);
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [modalOpen, setModalOpen] = useState(false);
 
   const safeVisible = ensureAtLeastOne(visibleColumns, allDataColumns);
 
-  const columns = React.useMemo(
+  const columns = useMemo(
     () => [
       ...staticLeftColumns,
       ...buildDataColumns(safeVisible),
@@ -58,8 +62,13 @@ export default function TableKit<T>(
 
   return (
     <TableProvider value={{ openColumnManager: () => setModalOpen(true) }}>
-      <TableHeader />
-
+      {/* Single, reusable toolbar */}
+      <Toolbar
+        q={q}
+        onSearch={onSearch}
+        leftSlot={toolbarLeftSlot}
+        rightSlot={toolbarRightSlot}
+      />
       <TableShell table={table} renderAfterRow={renderAfterRow} />
 
       <Pagination

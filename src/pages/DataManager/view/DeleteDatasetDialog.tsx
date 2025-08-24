@@ -39,7 +39,7 @@ export default function DeleteDatasetDialog({ datasetId, datasetName }: Props) {
         <Button variant="destructive" size="sm">Delete dataset</Button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete dataset</DialogTitle>
           <DialogDescription>
@@ -49,7 +49,7 @@ export default function DeleteDatasetDialog({ datasetId, datasetName }: Props) {
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <div className="space-y-1">
+          <div className="space-y-4">
             <Label htmlFor="confirmName">Type the dataset name to confirm</Label>
             <Input
               id="confirmName"
