@@ -12,7 +12,7 @@ import {
   type Mode,
 } from "@/lib/datamanager/api";
 
-/** Minimal sort model */
+/** Minimal sort model (kept for compatibility; you can ignore sortKey if not used) */
 export type SortDir = "asc" | "desc";
 
 type ReducerState = {
@@ -24,7 +24,7 @@ type ReducerState = {
   pageSize: number;
   q: string;
   sortDir: SortDir;
-  sortKey: string | null;
+  sortKey: string | null; // kept but unused if you dropped sorting
 
   // server selection
   mode: Mode;
@@ -123,6 +123,7 @@ export function useViewReducer(datasetId: string) {
       const pageSize = Number(arg.sp.get("pp") || 50);
       const q = arg.sp.get("q") || "";
 
+      // keep sort keys for compatibility (you can ignore in UI)
       let sortKey: string | null = null;
       let sortDir: SortDir = "asc";
       const sortParam = arg.sp.get("sort");
@@ -155,13 +156,13 @@ export function useViewReducer(datasetId: string) {
     }
   );
 
-  // Track previous datasetId (to know when to also fetch meta/batches)
+  // Track previous datasetId (to choose batch on dataset change)
   const prevDatasetIdRef = useRef<string | null>(null);
 
   /**
    * ONE EFFECT:
-   * - If dataset changed: load meta + batches, pick latest batch
-   * - Then (or if dataset didn't change): load rows with current params
+   * - On dataset change: fetch meta + batches and pick FIRST batch id.
+   * - Always fetch rows using that concrete batch id (never undefined).
    */
   useEffect(() => {
     let active = true;
@@ -173,47 +174,59 @@ export function useViewReducer(datasetId: string) {
 
       try {
         const datasetChanged = prevDatasetIdRef.current !== state.datasetId;
-        let effectiveBatchId = state.batchId;
+        let batchIdToUse = state.batchId;
 
         if (datasetChanged) {
+          // meta -> mode
           const meta = await getDatasetMeta(state.datasetId);
           if (!active) return;
           const mode: Mode = meta.grouping_enabled ? "grouped" : "flat";
           dispatch({ type: "SET_META", dataset: meta, mode });
 
+          // batches -> pick FIRST (your rule: one batch per dataset)
           const stamps = await listBatchStamps(state.datasetId);
           if (!active) return;
           const batches = computeBatches(stamps);
-          effectiveBatchId = batches[0]?.id ?? null;
-          dispatch({ type: "SET_BATCHES", batches, batchId: effectiveBatchId });
+          batchIdToUse = batches[0]?.id ?? null;
+          dispatch({ type: "SET_BATCHES", batches, batchId: batchIdToUse });
+        } else {
+          // dataset unchanged; ensure we have a batch id
+          if (!batchIdToUse) {
+            const stamps = await listBatchStamps(state.datasetId);
+            if (!active) return;
+            const batches = computeBatches(stamps);
+            batchIdToUse = batches[0]?.id ?? null;
+            dispatch({ type: "SET_BATCHES", batches, batchId: batchIdToUse });
+          }
         }
 
-        if (effectiveBatchId) {
-          const { data, count } = await listRows({
-            datasetId: state.datasetId,
-            batchId: effectiveBatchId,
-            mode: state.mode,
-            page: state.page,
-            pageSize: state.pageSize,
-            q: state.q,
-            sortDir: state.sortDir,
-          } as any);
-
-          if (!active) return;
-
-          dispatch({ type: "SET_ROWS", rows: data, total: count });
-
-          // Seed visible columns once
-          if (!state.visibleColumns.length && data.length) {
-            const first = Object.keys(data[0]?.data ?? {}).slice(0, 8);
-            dispatch({ type: "PATCH", patch: { visibleColumns: first } });
-            try {
-              localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first));
-            } catch {}
-          }
-        } else {
-          // dataset with no batches/rows
+        // If STILL no batch (truly empty dataset): show empty rows and stop
+        if (!batchIdToUse) {
           dispatch({ type: "SET_ROWS", rows: [], total: 0 });
+          return;
+        }
+
+        // Fetch rows with a definite batchId (never undefined)
+        const { data, count } = await listRows({
+          datasetId: state.datasetId,
+          batchId: batchIdToUse,
+          mode: state.mode,
+          page: state.page,
+          pageSize: state.pageSize,
+          q: state.q,
+          sortDir: state.sortDir,
+        } as any);
+        if (!active) return;
+
+        dispatch({ type: "SET_ROWS", rows: data, total: count });
+
+        // Seed visible cols once
+        if (!state.visibleColumns.length && data.length) {
+          const first = Object.keys(data[0]?.data ?? {}).slice(0, 8);
+          dispatch({ type: "PATCH", patch: { visibleColumns: first } });
+          try {
+            localStorage.setItem(storageKey(state.datasetId), JSON.stringify(first));
+          } catch {}
         }
       } catch (e: any) {
         if (!active) return;
@@ -228,15 +241,13 @@ export function useViewReducer(datasetId: string) {
       active = false;
     };
   }, [
-    state.datasetId, // detect dataset change
-    state.batchId,   // if user changes it later
-    state.mode,
+    state.datasetId, // dataset switch -> re-pick first batch
     state.page,
     state.pageSize,
     state.q,
     state.sortDir,
-    state.sortKey,   // reserved (server sortKey later)
-    // NOTE: we intentionally do NOT include visibleColumns.length to avoid loops
+    state.mode,
+    state.sortKey, // safe to keep; ignored if not used server-side
   ]);
 
   /* ----------------------------------------------
@@ -244,7 +255,6 @@ export function useViewReducer(datasetId: string) {
    * ---------------------------------------------- */
   const updateParams = useCallback(
     (patch: Partial<Pick<ReducerState, "page" | "pageSize" | "q" | "sortDir" | "sortKey">>) => {
-      // compute next values (single source of truth)
       const nextPage =
         patch.sortKey !== undefined || patch.sortDir !== undefined
           ? 1
@@ -255,7 +265,6 @@ export function useViewReducer(datasetId: string) {
       const nextSortKey = patch.sortKey ?? state.sortKey;
       const nextSortDir = patch.sortDir ?? state.sortDir;
 
-      // reducer update
       dispatch({
         type: "PATCH",
         patch: {
@@ -269,7 +278,7 @@ export function useViewReducer(datasetId: string) {
         },
       });
 
-      // Update URL right here (idempotent)
+      // Update URL idempotently
       const next = new URLSearchParams(sp);
       next.set("page", String(nextPage));
       next.set("pp", String(nextPageSize));
@@ -341,7 +350,7 @@ export function useViewReducer(datasetId: string) {
 
   return {
     state: { ...state, pageCount },
-    // loaders (kept for API compatibility; table doesn't need them directly)
+    // loaders (kept for API compatibility)
     refreshAll: () => {},
     loadRows: () => {},
     loadChildren,
