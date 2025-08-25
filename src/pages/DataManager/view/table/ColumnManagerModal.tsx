@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ReferenceDatasetOption, ReferenceMeta } from "./types";
 import ColumnSelectorPanel from "./ColumnSelectorPanel";
 import ColumnRelationPanel from "./ColumnRelationPanel";
@@ -15,22 +16,13 @@ type Props = {
   open: boolean;
   onOpenChange: (value: boolean) => void;
 
-  /** All available data columns (canonical names) */
   all: string[];
-
-  /** Initially visible columns (defines initial order) */
   initialVisible: string[];
-
-  /** Called on Save with the new visible columns (ordered) */
   onApply: (nextVisible: string[]) => void;
 
-  /** Optional: initial references per column id */
   initialReferences?: Record<string, ReferenceMeta | undefined>;
-
-  /** Optional: called on Save with references per column id */
   onApplyReferences?: (next: Record<string, ReferenceMeta | undefined>) => void;
 
-  /** Optional: dropdown options for target datasets */
   referenceDatasets?: ReferenceDatasetOption[];
 };
 
@@ -44,20 +36,19 @@ export default function ColumnManagerModal({
   onApplyReferences,
   referenceDatasets = [],
 }: Props) {
-  // Tabs
   const [activeTab, setActiveTab] = useState<"columns" | "references">("columns");
 
-  // Column selection + order
+  // selection + order
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMap, setSelectedMap] = useState<Record<string, boolean>>({});
   const [order, setOrder] = useState<string[]>([]);
 
-  // References map
+  // references
   const [references, setReferences] = useState<
     Record<string, ReferenceMeta | undefined>
   >({});
 
-  // Init modal state on open
+  // init on open
   useEffect(() => {
     if (!open) return;
 
@@ -73,11 +64,10 @@ export default function ColumnManagerModal({
     setActiveTab("columns");
   }, [open, all, initialVisible, initialReferences]);
 
-  // Filter helper (shared across tabs)
   const filteredAllColumns = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) return all;
-    return all.filter((name) => name.toLowerCase().includes(normalizedQuery));
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter((name) => name.toLowerCase().includes(q));
   }, [searchQuery, all]);
 
   const selectedCount = useMemo(
@@ -90,55 +80,50 @@ export default function ColumnManagerModal({
     [order, selectedMap]
   );
 
-  // Toggle column selection
   const toggleColumn = (columnName: string) => {
-    setSelectedMap((previous) => {
-      const nextSelected = { ...previous, [columnName]: !previous[columnName] };
-      setOrder((previousOrder) => {
-        const nowSelected = nextSelected[columnName];
-        if (nowSelected && !previousOrder.includes(columnName)) {
-          return [...previousOrder, columnName];
+    setSelectedMap((prev) => {
+      const next = { ...prev, [columnName]: !prev[columnName] };
+      setOrder((prevOrder) => {
+        const nowSelected = next[columnName];
+        if (nowSelected && !prevOrder.includes(columnName)) {
+          return [...prevOrder, columnName];
         }
-        if (!nowSelected && previousOrder.includes(columnName)) {
-          return previousOrder.filter((n) => n !== columnName);
+        if (!nowSelected && prevOrder.includes(columnName)) {
+          return prevOrder.filter((n) => n !== columnName);
         }
-        return previousOrder;
+        return prevOrder;
       });
-      return nextSelected;
+      return next;
     });
   };
 
-  // Reorder callback for the Columns panel (only for selected items)
   const reorderSelected = (fromIndex: number, toIndex: number) => {
-    setOrder((previousOrder) => {
-      const onlySelected = previousOrder.filter((name) => selectedMap[name]);
-      const notSelected = previousOrder.filter((name) => !selectedMap[name]);
+    setOrder((prevOrder) => {
+      const onlySelected = prevOrder.filter((n) => selectedMap[n]);
+      const notSelected = prevOrder.filter((n) => !selectedMap[n]);
 
-      const nextSelectedOrder = [...onlySelected];
-      const [moved] = nextSelectedOrder.splice(fromIndex, 1);
-      nextSelectedOrder.splice(toIndex, 0, moved);
+      const nextSel = [...onlySelected];
+      const [moved] = nextSel.splice(fromIndex, 1);
+      nextSel.splice(toIndex, 0, moved);
 
-      return [...nextSelectedOrder, ...notSelected];
+      return [...nextSel, ...notSelected];
     });
   };
 
-  // Reference change helpers
   const saveReferenceForColumn = (columnId: string, targetDatasetId?: string) => {
-    setReferences((previous) => ({
-      ...previous,
+    setReferences((prev) => ({
+      ...prev,
       [columnId]: targetDatasetId ? { targetDatasetId } : undefined,
     }));
   };
-
   const clearReferenceForColumn = (columnId: string) => {
-    setReferences((previous) => {
-      const next = { ...previous };
+    setReferences((prev) => {
+      const next = { ...prev };
       delete next[columnId];
       return next;
     });
   };
 
-  // Save all changes
   const handleSave = () => {
     const nextVisible = order.filter((name) => selectedMap[name]);
     const fallback = all[0] ? [all[0]] : [];
@@ -149,9 +134,9 @@ export default function ColumnManagerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-[60vw] max-w-[90vw] p-0">
-        {/* Use a flex column wrapper with a single scroll container inside – no fixed heights */}
-        <div className="flex flex-col">
+      {/* cap dialog height and prevent outer overflow */}
+      <DialogContent className="min-w-[70vw] max-w-[90vw] max-h-[85vh] p-0 overflow-hidden">
+        <div className="flex h-full flex-col">
           {/* Header */}
           <DialogHeader className="p-6">
             <div className="flex items-center justify-between gap-4">
@@ -170,32 +155,18 @@ export default function ColumnManagerModal({
           </DialogHeader>
 
           {/* Tabs */}
-          <div className="border-b bg-muted/10 px-6">
-            <div className="flex gap-2">
-              {[
-                { key: "columns", label: "Columns" },
-                { key: "references", label: "References" },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key as "columns" | "references")}
-                  className={[
-                    "px-4 py-2 text-sm rounded-t-md transition-colors",
-                    activeTab === key
-                      ? "bg-background border border-b-transparent border-muted-foreground/30 font-medium"
-                      : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+            className="px-6 flex-1 min-h-0 flex flex-col"
+          >
+            <TabsList>
+              <TabsTrigger value="columns">Columns</TabsTrigger>
+              <TabsTrigger value="references">References</TabsTrigger>
+            </TabsList>
 
-          {/* Scrollable content area */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-6">
-            {/* Common filter */}
-            <div className="mb-4 flex items-center justify-between gap-2">
+            {/* Filter row (static) */}
+            <div className="mt-4 mb-4 flex items-center justify-between gap-2">
               <Input
                 placeholder={
                   activeTab === "columns"
@@ -204,7 +175,7 @@ export default function ColumnManagerModal({
                 }
                 className="h-8 w-[360px]"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
               <div className="text-xs text-muted-foreground">
                 {activeTab === "columns"
@@ -213,7 +184,8 @@ export default function ColumnManagerModal({
               </div>
             </div>
 
-            {activeTab === "columns" ? (
+            {/* Panels (each handles its own scrolling) */}
+            <TabsContent value="columns" className="m-0">
               <ColumnSelectorPanel
                 filteredAllColumns={filteredAllColumns}
                 selectedMap={selectedMap}
@@ -221,7 +193,9 @@ export default function ColumnManagerModal({
                 onToggleColumn={toggleColumn}
                 onReorderSelected={reorderSelected}
               />
-            ) : (
+            </TabsContent>
+
+            <TabsContent value="references" className="m-0">
               <ColumnRelationPanel
                 filteredAllColumns={filteredAllColumns}
                 references={references}
@@ -229,11 +203,11 @@ export default function ColumnManagerModal({
                 onSaveReference={saveReferenceForColumn}
                 onClearReference={clearReferenceForColumn}
               />
-            )}
-          </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t">
+          <div className="mt-auto flex items-center justify-end gap-2 p-6">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

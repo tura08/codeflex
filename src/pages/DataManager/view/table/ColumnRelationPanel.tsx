@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link2, X } from "lucide-react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import type { ReferenceDatasetOption, ReferenceMeta } from "./types";
 
 export default function ColumnRelationPanel(props: {
@@ -22,12 +23,10 @@ export default function ColumnRelationPanel(props: {
   const [draftTargetDatasetId, setDraftTargetDatasetId] = useState<string>("");
 
   const referenceLabelFor = (columnId: string) => {
-    const reference = references[columnId];
-    if (!reference?.targetDatasetId) return null;
-    const option = referenceDatasets.find(
-      (dataset) => dataset.id === reference.targetDatasetId
-    );
-    return option?.label ?? reference.targetDatasetId;
+    const ref = references[columnId];
+    if (!ref?.targetDatasetId) return null;
+    const option = referenceDatasets.find((d) => d.id === ref.targetDatasetId);
+    return option?.label ?? ref.targetDatasetId;
   };
 
   const startEdit = (columnId: string) => {
@@ -42,13 +41,16 @@ export default function ColumnRelationPanel(props: {
     setEditingColumnId(null);
   };
 
-  return (
-    <div className="rounded-md border">
-      <div className="max-h-[48vh] overflow-auto">
-        <div className="sticky top-0 z-10 border-b bg-background p-2 text-xs font-medium">
-          Column ⇢ Target dataset
-        </div>
+  // IMPORTANT: ScrollArea needs an explicit height (h-*), not max-h-*
+  const panelH = "h-[40vh]";
 
+  return (
+    <div className="rounded-md border flex flex-col">
+      <div className="border-b bg-background p-2 text-xs font-medium">
+        Column ⇢ Target dataset
+      </div>
+
+      <ScrollArea className={panelH}>
         <div className="p-2">
           {filteredAllColumns.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
@@ -104,7 +106,7 @@ export default function ColumnRelationPanel(props: {
                       </div>
                     </div>
 
-                    {/* Inline editor inside card */}
+                    {/* Inline editor */}
                     {isEditing && (
                       <div className="rounded-md border bg-muted/20 p-2">
                         <div className="mb-2 flex items-center justify-between">
@@ -130,9 +132,7 @@ export default function ColumnRelationPanel(props: {
                           <select
                             className="h-9 rounded-md border bg-background px-2 text-sm"
                             value={draftTargetDatasetId}
-                            onChange={(event) =>
-                              setDraftTargetDatasetId(event.target.value)
-                            }
+                            onChange={(e) => setDraftTargetDatasetId(e.target.value)}
                           >
                             <option value="">None</option>
                             {referenceDatasets.map((option) => (
@@ -156,7 +156,8 @@ export default function ColumnRelationPanel(props: {
             </div>
           )}
         </div>
-      </div>
+        <ScrollBar orientation="vertical" />
+      </ScrollArea>
     </div>
   );
 }

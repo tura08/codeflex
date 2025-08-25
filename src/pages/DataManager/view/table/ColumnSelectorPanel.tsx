@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export default function ColumnSelectorPanel(props: {
   filteredAllColumns: string[];
@@ -16,7 +17,7 @@ export default function ColumnSelectorPanel(props: {
     onReorderSelected,
   } = props;
 
-  // Local DnD highlight state
+  // DnD highlight state
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
@@ -28,17 +29,14 @@ export default function ColumnSelectorPanel(props: {
     } catch {}
     event.dataTransfer.effectAllowed = "move";
   };
-
   const handleDragEnter = (index: number) => (event: React.DragEvent) => {
     event.preventDefault();
     setOverIndex(index);
   };
-
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   };
-
   const handleDrop = (event: React.DragEvent, toIndex: number) => {
     event.preventDefault();
     const fromRaw = event.dataTransfer.getData("text/plain");
@@ -52,20 +50,22 @@ export default function ColumnSelectorPanel(props: {
     setDragIndex(null);
     setOverIndex(null);
   };
-
   const handleDragEnd = () => {
     setDragIndex(null);
     setOverIndex(null);
   };
 
+  // We cap the inner content to ~60vh so it scrolls inside the panel only
+  const panelMaxH = "max-h-[40vh]";
+
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {/* LEFT: All columns (select/deselect) */}
-      <div className="rounded-md border">
-        <div className="max-h-[48vh] overflow-auto">
-          <div className="sticky top-0 z-10 border-b bg-background p-2 text-xs font-medium">
-            All columns
-          </div>
+      <div className="rounded-md border flex flex-col">
+        <div className="border-b bg-background p-2 text-xs font-medium">
+          All columns
+        </div>
+        <ScrollArea className={panelMaxH}>
           <div className="p-2">
             {filteredAllColumns.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground">
@@ -94,16 +94,17 @@ export default function ColumnSelectorPanel(props: {
               </ul>
             )}
           </div>
-        </div>
+          <ScrollBar orientation="vertical" />
+        </ScrollArea>
       </div>
 
       {/* RIGHT: Selected + reorder */}
-      <div className="rounded-md border">
-        <div className="max-h-[48vh] overflow-auto">
-          <div className="sticky top-0 z-10 border-b bg-background p-2 text-xs font-medium">
-            Selected (drag to reorder)
-          </div>
-        <div className="p-2">
+      <div className="rounded-md border flex flex-col">
+        <div className="border-b bg-background p-2 text-xs font-medium">
+          Selected (drag to reorder)
+        </div>
+        <ScrollArea className={panelMaxH}>
+          <div className="p-2">
             {selectedInOrder.length === 0 ? (
               <div className="py-10 text-center text-xs text-muted-foreground">
                 No selected columns to reorder.
@@ -117,10 +118,10 @@ export default function ColumnSelectorPanel(props: {
                       overIndex === index ? "bg-muted/60" : "bg-background"
                     }`}
                     draggable
-                    onDragStart={(event) => handleDragStart(event, index)}
+                    onDragStart={(e) => handleDragStart(e, index)}
                     onDragEnter={handleDragEnter(index)}
                     onDragOver={handleDragOver}
-                    onDrop={(event) => handleDrop(event, index)}
+                    onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -142,7 +143,8 @@ export default function ColumnSelectorPanel(props: {
               </ul>
             )}
           </div>
-        </div>
+          <ScrollBar orientation="vertical" />
+        </ScrollArea>
       </div>
     </div>
   );
