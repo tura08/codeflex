@@ -1,4 +1,4 @@
-import * as React from "react";
+import { useCallback, useMemo } from "react";
 import TableKit from "./table/TableKit";
 import type { ColumnDefLike } from "./table/types";
 import { formatCell } from "./table/utils";
@@ -19,22 +19,59 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DataTable() {
   const view = useViewController();
   const { state, updateParams, setVisibleColumns, toggleRowExpanded, loadChildren } = view;
-  const { mode, rows, page, pageSize, pageCount, q, visibleColumns, loading, expandedKeys, childrenCache } = state;
+  const {
+    mode,
+    rows,
+    page,
+    pageSize,
+    pageCount,
+    q,
+    visibleColumns,
+    loading,
+    expandedKeys,
+    childrenCache,
+  } = state;
 
-  const allColumns = React.useMemo(
+  const allColumns = useMemo(
     () => (rows.length ? Object.keys(rows[0]?.data ?? {}) : []),
     [rows]
   );
+  const allKeys = useMemo(() => new Set(allColumns), [allColumns]);
 
   const dataCols = useColumnsDnD<Row>(visibleColumns, (next) => setVisibleColumns(next));
 
-  // ✅ stable right columns & builder
-  const rightCols = React.useMemo(() => [jsonColumn(), actionsColumn()], []);
-  const buildCols = React.useCallback(() => dataCols, [dataCols]);
+  /**
+   * Minimal normalization so TanStack can sort locally:
+   * - ensure each data col has `id` and `accessorKey` that maps to row.data[key]
+   * - default enableSorting: true (unless explicitly disabled)
+   */
+  const normalizedDataCols = useMemo(() => {
+    return dataCols.map((col: any, i: number) => {
+      const guessedKey: string | undefined = col.id ?? col.accessorKey ?? visibleColumns[i];
+      const key = guessedKey && allKeys.has(guessedKey) ? guessedKey : undefined;
 
-  const isOpen = React.useCallback((key: string) => expandedKeys.has(key), [expandedKeys]);
+      if (!key) {
+        return { ...col, enableSorting: false };
+      }
 
-  const onToggle = React.useCallback(
+      const hasAccessor = !!col.accessorKey || !!col.accessorFn;
+      const withAccessor = hasAccessor ? col : { ...col, accessorKey: key };
+
+      return {
+        ...withAccessor,
+        id: key,
+        enableSorting: col.enableSorting ?? true,
+      };
+    });
+  }, [dataCols, visibleColumns, allKeys]);
+
+  // Stable right columns & builder
+  const rightCols = useMemo(() => [jsonColumn(), actionsColumn()], []);
+  const buildCols = useCallback(() => normalizedDataCols, [normalizedDataCols]);
+
+  const isOpen = useCallback((key: string) => expandedKeys.has(key), [expandedKeys]);
+
+  const onToggle = useCallback(
     async (key: string) => {
       const currentlyOpen = expandedKeys.has(key);
       toggleRowExpanded(key);
@@ -45,14 +82,14 @@ export default function DataTable() {
     [expandedKeys, toggleRowExpanded, mode, childrenCache, loadChildren]
   );
 
-  const leftCols = React.useMemo(() => {
+  const leftCols = useMemo(() => {
     const base: ColumnDefLike<Row>[] = [selectionColumn<Row>()];
     if (mode === "grouped") base.push(expanderColumn({ isOpen, onToggle }));
     base.push(idColumn());
     return base;
   }, [mode, isOpen, onToggle]);
 
-  const renderAfterRow = React.useCallback(
+  const renderAfterRow = useCallback(
     (tanRow: any, leafColCount: number) => {
       if (mode !== "grouped") return null;
       const r: Row = tanRow.original;
@@ -103,6 +140,7 @@ export default function DataTable() {
       onPageChange={(p) => updateParams({ page: p })}
       onPageSizeChange={(s) => updateParams({ pageSize: s, page: 1 })}
       onVisibleColumnsChange={(cols) => setVisibleColumns(cols)}
+      // No sorting props: TanStack sorts locally
     />
   );
 }

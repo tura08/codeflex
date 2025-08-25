@@ -1,4 +1,3 @@
-// src/pages/DataManager/view/table/TableShell.tsx
 import * as React from "react";
 import {
   flexRender,
@@ -35,16 +34,56 @@ export function TableShell<T>({
         <TableHeader className="sticky top-0 z-10 bg-muted [&_tr]:border-b">
           {table.getHeaderGroups().map((hg) => (
             <TableRow key={hg.id}>
-              {hg.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                </TableHead>
-              ))}
+              {hg.headers.map((header) => {
+                const canSort = header.column.getCanSort?.() ?? false;
+                const sorted = header.column.getIsSorted?.() as
+                  | false
+                  | "asc"
+                  | "desc";
+
+                const ariaSort =
+                  sorted === "asc"
+                    ? "ascending"
+                    : sorted === "desc"
+                    ? "descending"
+                    : "none";
+
+                const toggle = canSort
+                  ? header.column.getToggleSortingHandler?.()
+                  : undefined;
+
+                return (
+                  <TableHead
+                    key={header.id}
+                    onClick={toggle}
+                    aria-sort={ariaSort as React.AriaAttributes["aria-sort"]}
+                    className={canSort ? "cursor-pointer select-none" : undefined}
+                    title={
+                      canSort
+                        ? sorted === "asc"
+                          ? "Sorted ascending — click to sort descending"
+                          : sorted === "desc"
+                          ? "Sorted descending — click to clear sort"
+                          : "Click to sort ascending"
+                        : undefined
+                    }
+                  >
+                    {header.isPlaceholder ? null : (
+                      <div className="flex items-center gap-1">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                        {sorted && (
+                          <span aria-hidden="true" className="inline-block leading-none">
+                            {sorted === "asc" ? "▲" : "▼"}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </TableHead>
+                );
+              })}
             </TableRow>
           ))}
         </TableHeader>

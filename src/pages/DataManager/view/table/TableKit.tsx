@@ -15,6 +15,10 @@ export default function TableKit<T>(
     toolbarLeftSlot?: ReactNode;
     toolbarRightSlot?: ReactNode;
     q?: string | null;
+
+    // NEW: server-side sorting (TanStack SortingState)
+    sorting?: Array<{ id: string; desc: boolean }>;
+    onSortingChange?: (next: Array<{ id: string; desc: boolean }>) => void;
   }
 ) {
   const {
@@ -36,6 +40,10 @@ export default function TableKit<T>(
     renderAfterRow,
     toolbarLeftSlot,
     toolbarRightSlot,
+
+    // NEW
+    sorting,
+    onSortingChange,
   } = props;
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
@@ -56,8 +64,15 @@ export default function TableKit<T>(
     data,
     columns,
     getRowId: idForRow,
+
     rowSelection,
     onRowSelectionChange: setRowSelection,
+
+    // NEW: pass sorting + global filter to adapter (server-side)
+    sorting,
+    onSortingChange,
+    globalFilter: q ?? "",
+    onGlobalFilterChange: onSearch,
   });
 
   return (
@@ -68,6 +83,7 @@ export default function TableKit<T>(
         leftSlot={toolbarLeftSlot}
         rightSlot={toolbarRightSlot}
       />
+
       <TableShell table={table} renderAfterRow={renderAfterRow} />
 
       <Pagination
